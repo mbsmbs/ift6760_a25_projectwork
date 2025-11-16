@@ -1,7 +1,53 @@
 import networkx as nx
 import numpy as np
 import torch
-from pytorch3d.transforms import axis_angle_to_matrix
+# Try to use PyTorch3D if available, otherwise fall back to a pure PyTorch implementation.
+try:
+    from pytorch3d.transforms import axis_angle_to_matrix  # type: ignore
+except ImportError:
+    def axis_angle_to_matrix(axis_angle: torch.Tensor) -> torch.Tensor:
+        """
+        Minimal reimplementation of pytorch3d.transforms.axis_angle_to_matrix
+        using Rodrigues' rotation formula.
+
+        axis_angle: (..., 3) tensor of axis * angle (radians).
+        Returns:    (..., 3, 3) rotation matrices.
+        """
+        # angle = ||v||
+        angle = torch.norm(axis_angle, dim=-1, keepdim=True)  # (..., 1)
+        # avoid division by zero
+        axis = axis_angle / (angle + 1e-8)
+
+        x, y, z = axis.unbind(-1)  # each (...,)
+
+        ca = torch.cos(angle)[..., 0]  # (...,)
+        sa = torch.sin(angle)[..., 0]
+        C = 1.0 - ca
+
+        xx = x * x
+        yy = y * y
+        zz = z * z
+        xy = x * y
+        xz = x * z
+        yz = y * z
+
+        m00 = ca + xx * C
+        m01 = xy * C - z * sa
+        m02 = xz * C + y * sa
+
+        m10 = xy * C + z * sa
+        m11 = ca + yy * C
+        m12 = yz * C - x * sa
+
+        m20 = xz * C - y * sa
+        m21 = yz * C + x * sa
+        m22 = ca + zz * C
+
+        row0 = torch.stack([m00, m01, m02], dim=-1)
+        row1 = torch.stack([m10, m11, m12], dim=-1)
+        row2 = torch.stack([m20, m21, m22], dim=-1)
+
+        return torch.stack([row0, row1, row2], dim=-2)
 
 from gflownet.utils.molecule import constants
 
