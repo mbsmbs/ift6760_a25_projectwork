@@ -15,3 +15,4 @@ external/
 .DS_Store
 docs/_build/
 debug_env.py
+inspect_env.py
