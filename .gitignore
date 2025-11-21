@@ -14,6 +14,5 @@ external/
 !docs/requirements-docs.txt
 .DS_Store
 docs/_build/
-debug_env.py
-inspect_env.py
-single_step_debug.py
+
+project_debug/
