@@ -16,3 +16,4 @@ external/
 docs/_build/
 
 project_debug/
+*.ckpt
