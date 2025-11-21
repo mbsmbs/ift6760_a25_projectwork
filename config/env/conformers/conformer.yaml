@@ -1,33 +1,90 @@
+# defaults:
+#   - base
+
+# _target_: gflownet.envs.conformers.conformer.Conformer
+
+# # smiles: 'CC(C(=O)NC)NC(=O)C' # alanine dipeptide
+# # smiles: 'CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O' # ibuprofen
+# # smiles: 'O=C(c1ccc2n1CCC2C(=O)O)c3ccccc3' # ketorolac
+# # smiles: 'CCCCCC1=CC(=C(C(=C1)O)C2C=C(CCC2C(=C)C)C)O' # cannabidiol
+# # smiles: 'CN1C2CCC1C(C(C2)OC(=O)C3=CC=CC=C3)C(=O)OC' # cocaine
+# # smiles: 'Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C' # imatinib
+# # smiles: 'CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4' # ritonavir
+
+# n_torsion_angles: 2
+# reward_sampling_method: nested
+
+# id: conformer
+# policy_encoding_dim_per_angle: null
+# # Fixed length of trajectories
+# length_traj: 10
+# vonmises_min_concentration: 1e-3
+# # Parameters of the fixed policy output distribution
+# n_comp: 3
+# fixed_distribution:
+#   vonmises_mean: 0.0
+#   vonmises_concentration: 0.5
+# # Parameters of the random policy output distribution
+# random_distribution:
+#   vonmises_mean: 0.0
+#   vonmises_concentration: 0.001
+# # Buffer
+# buffer:
+#   data_path: null
+#   train: null
+#   test:
+#     type: random
+#     seed: 0
+#     n: 4096
+#     output_csv: conformer_test.csv
+#     output_pkl: conformer_test.pkl
+
+
+# Tries
 defaults:
   - base
 
 _target_: gflownet.envs.conformers.conformer.Conformer
 
-# smiles: 'CC(C(=O)NC)NC(=O)C' # alanine dipeptide
-# smiles: 'CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O' # ibuprofen
-smiles: 'O=C(c1ccc2n1CCC2C(=O)O)c3ccccc3' # ketorolac
-# smiles: 'CCCCCC1=CC(=C(C(=C1)O)C2C=C(CCC2C(=C)C)C)O' # cannabidiol
-# smiles: 'CN1C2CCC1C(C(C2)OC(=O)C3=CC=CC=C3)C(=O)OC' # cocaine
+# Example molecules (keep commented if you want to switch later)
+# smiles: 'CC(C(=O)NC)NC(=O)C'                             # alanine dipeptide
+# smiles: 'O=C(c1ccc2n1CCC2C(=O)O)c3ccccc3'               # ketorolac
+# smiles: 'CCCCCC1=CC(=C(C(=C1)O)C2C=C(CCC2C(=C)C)C)O'    # cannabidiol
+# smiles: 'CN1C2CCC1C(C(C2)OC(=O)C3=CC=CC=C3)C(=O)OC'     # cocaine
 # smiles: 'Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C' # imatinib
 # smiles: 'CC(C)c4nc(CN(C)C(=O)N[C@@H](C(C)C)C(=O)N[C@@H](Cc1ccccc1)C[C@H](O)[C@H](Cc2ccccc2)NC(=O)OCc3cncs3)cs4' # ritonavir
-n_torsion_angles: 2
+
+# Active molecule: ibuprofen
+smiles: 'CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O'  # ibuprofen
+
+# Use all freely rotatable torsions detected from the SMILES
+n_torsion_angles: -1
+
+# How rewards are sampled along the trajectory (same as original)
 reward_sampling_method: nested
 
+# Environment id
 id: conformer
-policy_encoding_dim_per_angle: null
-# Fixed length of trajectories
-length_traj: 10
-vonmises_min_concentration: 1e-3
-# Parameters of the fixed policy output distribution
-n_comp: 3
+
+# Policy / trajectory hyperparameters
+policy_encoding_dim_per_angle: 10
+# Fixed length of trajectories (number of torsion updates)
+length_traj: 5
+
+# Minimum concentration for von Mises components (controls sharpness)
+vonmises_min_concentration: 4
+
+# Mixture of von Mises for the policy output
+n_comp: 5
 fixed_distribution:
   vonmises_mean: 0.0
   vonmises_concentration: 0.5
-# Parameters of the random policy output distribution
+
 random_distribution:
   vonmises_mean: 0.0
   vonmises_concentration: 0.001
-# Buffer
+
+# Replay buffer setup
 buffer:
   data_path: null
   train: null
@@ -37,3 +94,39 @@ buffer:
     n: 4096
     output_csv: conformer_test.csv
     output_pkl: conformer_test.pkl
+  replay_capacity: 1000
+
+# Extra fields that were coming from base / experiment configs
+# (ok to keep here for clarity / overriding)
+policy_type: mlp
+reward_func: boltzmann
+reward_beta: 32
+
+# --- NEW: flexible bond lengths / bond angles to treat as DOFs ---
+
+# List of [i, j] atom index pairs whose bond lengths can vary
+flex_bond_lengths:
+  # backbone C–C–C near the isobutyl group
+  - [0, 1]    # C0–C1
+  - [1, 2]    # C1–C2
+  - [1, 3]    # C1–C3
+  - [3, 4]    # C3–C4
+  # side chain near aromatic/carboxyl
+  - [7, 10]   # C7–C10
+  - [10, 11]  # C10–C11
+  - [10, 12]  # C10–C12
+  - [12, 14]  # C12–O14  (single C–O)
+
+# List of [i, j, k] atom triplets whose bond angles can vary
+flex_bond_angles:
+  # around the central C1
+  - [0, 1, 2]   # C0–C1–C2
+  - [0, 1, 3]   # C0–C1–C3
+  - [2, 1, 3]   # C2–C1–C3
+  # around C3–C4–C5 (entry to aromatic ring)
+  - [1, 3, 4]   # C1–C3–C4
+  - [3, 4, 5]   # C3–C4–C5
+  # around side chain C7–C10–C11/C12
+  - [7, 10, 11] # C7–C10–C11
+  - [7, 10, 12] # C7–C10–C12
+  - [10, 12, 14]# C10–C12–O14
