@@ -142,12 +142,9 @@ class Conformer(ContinuousTorus):
         torsion_indices: Optional[List[int]] = None,
         policy_type: str = "mlp",
         remove_hs: bool = True,
-        # ---- NEW: extra DOFs from YAML ----
-        n_bond_lengths: int = 0,
-        bond_length_indices: Optional[List[int]] = None,
-        n_bond_angles: int = 0,
-        bond_angle_indices: Optional[List[int]] = None,
-        # -----------------------------------
+        # NEW: extra DOFs, coming directly from YAML
+        flex_bond_lengths: Optional[List[Tuple[int, int]]] = None,
+        flex_bond_angles: Optional[List[Tuple[int, int, int]]] = None,
         **kwargs,
     ):
         if torsion_indices is None:
@@ -168,52 +165,50 @@ class Conformer(ContinuousTorus):
 
         self.smiles = smiles
         self.torsion_indices = torsion_indices
+
+        # RDKit geometry
         self.atom_positions = Conformer._get_positions(self.smiles)
         self.torsion_angles = Conformer._get_torsion_angles(
             self.smiles, self.torsion_indices
         )
         self.set_conformer()
 
-                # ------------------------------------------------------------------
-        # Internal coordinates meta-data: torsions, bond lengths, bond angles
         # ------------------------------------------------------------------
-        # Torsions used as DOFs
+        # Internal coordinates meta-data: torsions, flex bond lengths/angles
+        # ------------------------------------------------------------------
+        # torsions used as DOFs
         self.n_torsion_angles = len(self.torsion_angles)
 
-        # All RDKit bonds -> list of atom pairs (i, j)
-        mol = self.conformer.rdk_mol
-        all_bond_pairs: List[Tuple[int, int]] = [
-            (b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
-        ]
+        # bond length / angle DOFs from YAML
+        self.flex_bond_lengths: List[Tuple[int, int]] = flex_bond_lengths or []
+        self.flex_bond_angles: List[Tuple[int, int, int]] = flex_bond_angles or []
 
-        # Choose which bonds are used as length DOFs
-        if bond_length_indices is None:
-            # take the first n_bond_lengths bonds (if n_bond_lengths > 0)
-            self.bond_pairs: List[Tuple[int, int]] = all_bond_pairs[:n_bond_lengths]
+        self.n_bond_lengths = len(self.flex_bond_lengths)
+        self.n_bond_angles = len(self.flex_bond_angles)
+
+        # Store equilibrium values (before any modification)
+        if self.n_bond_lengths > 0:
+            self.ref_bond_lengths = self.conformer.get_bond_length_vector(
+                self.flex_bond_lengths
+            )
         else:
-            self.bond_pairs = [all_bond_pairs[i] for i in bond_length_indices]
-        self.n_bond_lengths = len(self.bond_pairs)
+            self.ref_bond_lengths = np.zeros(0, dtype=float)
 
-        # All possible angles i–j–k around each central atom j
-        all_angle_triples: List[Tuple[int, int, int]] = Conformer._get_all_bond_angles(
-            mol
-        )
-
-        # Choose which angles are used as angle DOFs
-        if bond_angle_indices is None:
-            self.angle_triples: List[Tuple[int, int, int]] = all_angle_triples[
-                :n_bond_angles
-            ]
+        if self.n_bond_angles > 0:
+            self.ref_bond_angles = self.conformer.get_angle_vector(
+                self.flex_bond_angles
+            )
         else:
-            self.angle_triples = [all_angle_triples[i] for i in bond_angle_indices]
-        self.n_bond_angles = len(self.angle_triples)
+            self.ref_bond_angles = np.zeros(0, dtype=float)
 
-        # Total number of internal DOFs used by the torus:
-        #   torsions + bond lengths + bond angles
+        # Small scales so we don't destroy the geometry
+        self.length_scale = 0.05   # Å per latent unit
+        self.angle_scale = 0.3     # rad per latent unit
+
+        # Total internal DOF dimension *without* time:
         internal_dim = (
             self.n_torsion_angles + self.n_bond_lengths + self.n_bond_angles
         )
-        # ----------- Added -----------
 
         # Conversions
         self.statebatch2oracle = self.statebatch2proxy
@@ -225,8 +220,8 @@ class Conformer(ContinuousTorus):
                 f"Unrecognized policy_type = {policy_type}, expected either 'mlp' or 'gnn'."
             )
 
+        # Graph / featurizer
         self.graph = MolDGLFeaturizer(ad_atom_types).mol2dgl(self.conformer.rdk_mol)
-        # TODO: use DGL conformer instead
         rotatable_edges = [ta[1:3] for ta in self.torsion_angles]
         for i in range(self.graph.num_edges()):
             if (
@@ -242,20 +237,29 @@ class Conformer(ContinuousTorus):
         if remove_hs:
             self.graph = dgl.remove_nodes(self.graph, self.hs)
 
-        # super().__init__(n_dim=len(self.conformer.freely_rotatable_tas), **kwargs)
+        # IMPORTANT: the torus dimension is now torsions + lengths + angles
         super().__init__(n_dim=internal_dim, **kwargs)
 
+        # initialize RDKit geometry to match the initial state
         self.sync_conformer_with_state()
 
     def set_conformer(self, state: Optional[List] = None) -> RDKitConformer:
+        """
+        Create a fresh RDKitConformer from the current atom_positions/smiles/torsions.
+        Bond-length / angle DOFs are handled separately in sync_conformer_with_state,
+        we do NOT pass them here.
+        """
         self.conformer = RDKitConformer(
-            self.atom_positions, self.smiles, self.torsion_angles
+            self.atom_positions,
+            self.smiles,
+            self.torsion_angles,   # freely_rotatable_tas
         )
 
         if state is not None:
             self.sync_conformer_with_state(state)
 
         return self.conformer
+
 
     @staticmethod
     def _get_positions(smiles: str) -> npt.NDArray:
@@ -297,40 +301,60 @@ class Conformer(ContinuousTorus):
 
     def sync_conformer_with_state(self, state: List = None):
         """
-        Map a full torus state to the RDKitConformer:
+        Map a torus state to the RDKitConformer.
 
-        state = [
-            θ_0, ..., θ_{n_torsion-1},
-            ℓ_0, ..., ℓ_{n_len-1},
-            α_0, ..., α_{n_ang-1},
-            t
-        ]
-        where the last component t is the "time" coordinate used by the policy/KDE.
+        State can be either:
+          - [θ_0, ..., θ_{n_tors-1},
+             z_len_0, ..., z_len_{n_len-1},
+             z_ang_0, ..., z_ang_{n_ang-1}]            (length = internal_dim)
+        or
+          - same as above plus a final time coord t:  (length = internal_dim + 1)
         """
         if state is None:
             state = self.state
 
-        # Drop the last component (time)
-        internal = np.asarray(state[:-1], dtype=float)
+        state = np.asarray(state, dtype=float)
+
+        internal_dim = (
+            self.n_torsion_angles
+            + self.n_bond_lengths
+            + self.n_bond_angles
+        )
+
+        if state.shape[0] == internal_dim + 1:
+            # Drop time coordinate
+            internal = state[:-1]
+        elif state.shape[0] == internal_dim:
+            internal = state
+        else:
+            raise ValueError(
+                f"Expected state of length {internal_dim} or {internal_dim + 1}, "
+                f"got {state.shape[0]}"
+            )
 
         # Split into torsions / bond lengths / bond angles
         k0 = self.n_torsion_angles
         k1 = k0 + self.n_bond_lengths
         k2 = k1 + self.n_bond_angles
 
-        torsions = internal[:k0]
-        bond_lengths = internal[k0:k1] if self.n_bond_lengths > 0 else None
-        bond_angles = internal[k1:k2] if self.n_bond_angles > 0 else None
+        z_tors = internal[:k0]
+        z_len = internal[k0:k1] if self.n_bond_lengths > 0 else None
+        z_ang = internal[k1:k2] if self.n_bond_angles > 0 else None
 
-        # Apply to RDKitConformer
+        # --- Torsions: interpret directly as angles in radians ---
         if self.n_torsion_angles > 0:
-            self.conformer.set_torsion_vector(self.torsion_angles, torsions)
+            self.conformer.set_torsion_vector(self.torsion_angles, z_tors)
 
-        if self.n_bond_lengths > 0 and bond_lengths is not None:
-            self.conformer.set_bond_length_vector(self.bond_pairs, bond_lengths)
+        # --- Bond lengths / angles: offsets around reference geometry ---
+        if self.n_bond_lengths > 0 and z_len is not None:
+            # self.ref_bond_lengths in Å, z_len is dimensionless
+            new_lengths = self.ref_bond_lengths + self.length_scale * z_len
+            self.conformer.set_bond_length_vector(self.flex_bond_lengths, new_lengths)
 
-        if self.n_bond_angles > 0 and bond_angles is not None:
-            self.conformer.set_angle_vector(self.angle_triples, bond_angles)
+        if self.n_bond_angles > 0 and z_ang is not None:
+            # self.ref_bond_angles in radians, z_ang is dimensionless
+            new_angles = self.ref_bond_angles + self.angle_scale * z_ang
+            self.conformer.set_angle_vector(self.flex_bond_angles, new_angles)
 
         return self.conformer
 
