@@ -1,3 +1,6 @@
+import math
+from typing import List, Optional, Tuple
+
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem, TorsionFingerprints, rdMolTransforms
@@ -38,9 +41,15 @@ def get_dummy_ad_rdkconf():
 
 
 class RDKitConformer:
-    def __init__(self, atom_positions, smiles, freely_rotatable_tas=None):
+    def __init__(
+            self, 
+            atom_positions, 
+            smiles, 
+            freely_rotatable_tas:Optional[List[Tuple[int, int, int, int]]]=None):
         """
         :param atom_positions: numpy.ndarray of shape [num_atoms, 3] of dtype float64
+        :param smiles: SMILES string for the molecule
+        :param freely_rotatable_tas: list of torsion quadruples (i,j,k,l) to control
         """
         self.smiles = smiles
         self.rdk_mol = self.get_mol_from_smiles(smiles)
@@ -129,6 +138,61 @@ class RDKitConformer:
         """
         initial_value = rdMolTransforms.GetDihedralRad(self.rdk_conf, *torsion_angle)
         self.set_torsion_angle(torsion_angle, initial_value + increment)
+
+    # ---- NEW: low-level getters ----
+    def get_bond_length(self, i, j):
+        """Return distance (Å) between atoms i and j."""
+        return rdMolTransforms.GetBondLength(self.conformer, int(i), int(j))
+
+    def set_bond_length(self, i, j, length):
+        """Set distance (Å) between atoms i and j."""
+        rdMolTransforms.SetBondLength(self.conformer, int(i), int(j), float(length))
+
+    def get_angle(self, i, j, k):
+        """Return angle (radians) for i–j–k."""
+        deg = rdMolTransforms.GetAngleDeg(self.conformer, int(i), int(j), int(k))
+        return math.radians(deg)
+
+    def set_angle(self, i, j, k, theta_rad):
+        """Set angle (radians) for i–j–k."""
+        deg = math.degrees(theta_rad)
+        rdMolTransforms.SetAngleDeg(self.conformer, int(i), int(j), int(k), deg)
+
+        rdMolTransforms.SetAngleDeg(self.conformer, int(i), int(j), int(k), deg)
+
+    # ---- NEW: vectorized access using index lists ----
+    def get_torsion_vector(self, torsions):
+        """torsions: list of 4-tuples (i,j,k,l); returns np.array of angles (rad)."""
+        return np.array(
+            [self.get_torsion_angle(ta) for ta in torsions], dtype=float
+        )
+
+    def set_torsion_vector(self, torsions, values):
+        """values: array-like of angles (rad) same length as torsions."""
+        for ta, v in zip(torsions, values):
+            self.set_torsion_angle(ta, float(v))
+
+    def get_bond_length_vector(self, bond_pairs):
+        """bond_pairs: list[(i,j)] -> np.array of lengths (Å)."""
+        return np.array(
+            [self.get_bond_length(i, j) for (i, j) in bond_pairs], dtype=float
+        )
+
+    def set_bond_length_vector(self, bond_pairs, values):
+        for (i, j), v in zip(bond_pairs, values):
+            self.set_bond_length(i, j, float(v))
+
+    def get_angle_vector(self, angle_triples):
+        """angle_triples: list[(i,j,k)] -> np.array of angles (rad)."""
+        return np.array(
+            [self.get_angle(i, j, k) for (i, j, k) in angle_triples], dtype=float
+        )
+
+    def set_angle_vector(self, angle_triples, values):
+        for (i, j, k), v in zip(angle_triples, values):
+            self.set_angle(i, j, k, float(v))
+    
+    #-------------------------------------Added---------------------------------
 
 
 if __name__ == "__main__":
