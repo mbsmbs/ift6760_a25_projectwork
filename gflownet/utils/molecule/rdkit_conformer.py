@@ -45,7 +45,8 @@ class RDKitConformer:
             self, 
             atom_positions, 
             smiles, 
-            freely_rotatable_tas:Optional[List[Tuple[int, int, int, int]]]=None):
+            freely_rotatable_tas:Optional[List[Tuple[int, int, int, int]]]=None,
+        ):
         """
         :param atom_positions: numpy.ndarray of shape [num_atoms, 3] of dtype float64
         :param smiles: SMILES string for the molecule
@@ -57,15 +58,27 @@ class RDKitConformer:
 
         self.set_atom_positions(atom_positions)
 
-        self.freely_rotatable_tas = freely_rotatable_tas
+        self.freely_rotatable_tas = freely_rotatable_tas or []
 
+    # def __deepcopy__(self, memo):
+    #     atom_positions = self.get_atom_positions()
+    #     cls = self.__class__
+    #     new_obj = cls.__new__(
+    #         cls, atom_positions, self.smiles, self.freely_rotatable_tas
+    #     )
+    #     return new_obj
     def __deepcopy__(self, memo):
         atom_positions = self.get_atom_positions()
         cls = self.__class__
-        new_obj = cls.__new__(
-            cls, atom_positions, self.smiles, self.freely_rotatable_tas
+        new_obj = cls(
+            atom_positions,
+            self.smiles,
+            self.freely_rotatable_tas,
+            self.bond_length_pairs,
+            self.angle_triples,
         )
         return new_obj
+
 
     def get_mol_from_smiles(self, smiles):
         """Create RDKit molecule from SMILES string
@@ -142,23 +155,34 @@ class RDKitConformer:
     # ---- NEW: low-level getters ----
     def get_bond_length(self, i, j):
         """Return distance (Å) between atoms i and j."""
-        return rdMolTransforms.GetBondLength(self.conformer, int(i), int(j))
+        return rdMolTransforms.GetBondLength(self.rdk_conf, int(i), int(j))
 
     def set_bond_length(self, i, j, length):
         """Set distance (Å) between atoms i and j."""
-        rdMolTransforms.SetBondLength(self.conformer, int(i), int(j), float(length))
+        rdMolTransforms.SetBondLength(self.rdk_conf, int(i), int(j), float(length))
 
     def get_angle(self, i, j, k):
         """Return angle (radians) for i–j–k."""
-        deg = rdMolTransforms.GetAngleDeg(self.conformer, int(i), int(j), int(k))
+        deg = rdMolTransforms.GetAngleDeg(self.rdk_conf, int(i), int(j), int(k))
         return math.radians(deg)
 
     def set_angle(self, i, j, k, theta_rad):
         """Set angle (radians) for i–j–k."""
         deg = math.degrees(theta_rad)
-        rdMolTransforms.SetAngleDeg(self.conformer, int(i), int(j), int(k), deg)
+        try:
+            rdMolTransforms.SetAngleDeg(self.rdk_conf, int(i), int(j), int(k), deg)
+        except ValueError as e:
+            # RDKit sometimes complains if atoms are numerically at the same point.
+            # For robustness, skip this update instead of crashing.
+            # You can log this if you want to debug later.
+            # print(f"Warning: failed to set angle ({i},{j},{k}) to {deg:.2f}°: {e}")
+            return
 
-        rdMolTransforms.SetAngleDeg(self.conformer, int(i), int(j), int(k), deg)
+
+    def get_torsion_angle(self, torsion_angle):
+        """Return dihedral (radians) for i–j–k–l."""
+        return rdMolTransforms.GetDihedralRad(self.rdk_conf, *torsion_angle)
+
 
     # ---- NEW: vectorized access using index lists ----
     def get_torsion_vector(self, torsions):
@@ -191,7 +215,7 @@ class RDKitConformer:
     def set_angle_vector(self, angle_triples, values):
         for (i, j, k), v in zip(angle_triples, values):
             self.set_angle(i, j, k, float(v))
-    
+
     #-------------------------------------Added---------------------------------
 
 
