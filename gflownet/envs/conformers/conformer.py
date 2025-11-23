@@ -142,6 +142,12 @@ class Conformer(ContinuousTorus):
         torsion_indices: Optional[List[int]] = None,
         policy_type: str = "mlp",
         remove_hs: bool = True,
+        # ---- NEW: extra DOFs from YAML ----
+        n_bond_lengths: int = 0,
+        bond_length_indices: Optional[List[int]] = None,
+        n_bond_angles: int = 0,
+        bond_angle_indices: Optional[List[int]] = None,
+        # -----------------------------------
         **kwargs,
     ):
         if torsion_indices is None:
@@ -167,6 +173,47 @@ class Conformer(ContinuousTorus):
             self.smiles, self.torsion_indices
         )
         self.set_conformer()
+
+                # ------------------------------------------------------------------
+        # Internal coordinates meta-data: torsions, bond lengths, bond angles
+        # ------------------------------------------------------------------
+        # Torsions used as DOFs
+        self.n_torsion_angles = len(self.torsion_angles)
+
+        # All RDKit bonds -> list of atom pairs (i, j)
+        mol = self.conformer.rdk_mol
+        all_bond_pairs: List[Tuple[int, int]] = [
+            (b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
+        ]
+
+        # Choose which bonds are used as length DOFs
+        if bond_length_indices is None:
+            # take the first n_bond_lengths bonds (if n_bond_lengths > 0)
+            self.bond_pairs: List[Tuple[int, int]] = all_bond_pairs[:n_bond_lengths]
+        else:
+            self.bond_pairs = [all_bond_pairs[i] for i in bond_length_indices]
+        self.n_bond_lengths = len(self.bond_pairs)
+
+        # All possible angles i–j–k around each central atom j
+        all_angle_triples: List[Tuple[int, int, int]] = Conformer._get_all_bond_angles(
+            mol
+        )
+
+        # Choose which angles are used as angle DOFs
+        if bond_angle_indices is None:
+            self.angle_triples: List[Tuple[int, int, int]] = all_angle_triples[
+                :n_bond_angles
+            ]
+        else:
+            self.angle_triples = [all_angle_triples[i] for i in bond_angle_indices]
+        self.n_bond_angles = len(self.angle_triples)
+
+        # Total number of internal DOFs used by the torus:
+        #   torsions + bond lengths + bond angles
+        internal_dim = (
+            self.n_torsion_angles + self.n_bond_lengths + self.n_bond_angles
+        )
+        # ----------- Added -----------
 
         # Conversions
         self.statebatch2oracle = self.statebatch2proxy
@@ -195,7 +242,8 @@ class Conformer(ContinuousTorus):
         if remove_hs:
             self.graph = dgl.remove_nodes(self.graph, self.hs)
 
-        super().__init__(n_dim=len(self.conformer.freely_rotatable_tas), **kwargs)
+        # super().__init__(n_dim=len(self.conformer.freely_rotatable_tas), **kwargs)
+        super().__init__(n_dim=internal_dim, **kwargs)
 
         self.sync_conformer_with_state()
 
@@ -225,12 +273,67 @@ class Conformer(ContinuousTorus):
             torsion_angles = [torsion_angles[i] for i in indices]
         return torsion_angles
 
+    # ----- New -----
+    @staticmethod
+    def _get_all_bond_angles(mol: Chem.Mol) -> List[Tuple[int, int, int]]:
+        """Enumerate all unique angles i–j–k where j is the central atom."""
+        angles: List[Tuple[int, int, int]] = []
+        for j in range(mol.GetNumAtoms()):
+            nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(j).GetNeighbors()]
+            # all unordered pairs (i, k) of neighbors of j
+            for a in range(len(nbrs)):
+                for b in range(a + 1, len(nbrs)):
+                    i, k = nbrs[a], nbrs[b]
+                    angles.append((i, j, k))
+        return angles
+    # ----- Added -----
+
+    # def sync_conformer_with_state(self, state: List = None):
+    #     if state is None:
+    #         state = self.state
+    #     for idx, ta in enumerate(self.conformer.freely_rotatable_tas):
+    #         self.conformer.set_torsion_angle(ta, state[idx])
+    #     return self.conformer
+
     def sync_conformer_with_state(self, state: List = None):
+        """
+        Map a full torus state to the RDKitConformer:
+
+        state = [
+            θ_0, ..., θ_{n_torsion-1},
+            ℓ_0, ..., ℓ_{n_len-1},
+            α_0, ..., α_{n_ang-1},
+            t
+        ]
+        where the last component t is the "time" coordinate used by the policy/KDE.
+        """
         if state is None:
             state = self.state
-        for idx, ta in enumerate(self.conformer.freely_rotatable_tas):
-            self.conformer.set_torsion_angle(ta, state[idx])
+
+        # Drop the last component (time)
+        internal = np.asarray(state[:-1], dtype=float)
+
+        # Split into torsions / bond lengths / bond angles
+        k0 = self.n_torsion_angles
+        k1 = k0 + self.n_bond_lengths
+        k2 = k1 + self.n_bond_angles
+
+        torsions = internal[:k0]
+        bond_lengths = internal[k0:k1] if self.n_bond_lengths > 0 else None
+        bond_angles = internal[k1:k2] if self.n_bond_angles > 0 else None
+
+        # Apply to RDKitConformer
+        if self.n_torsion_angles > 0:
+            self.conformer.set_torsion_vector(self.torsion_angles, torsions)
+
+        if self.n_bond_lengths > 0 and bond_lengths is not None:
+            self.conformer.set_bond_length_vector(self.bond_pairs, bond_lengths)
+
+        if self.n_bond_angles > 0 and bond_angles is not None:
+            self.conformer.set_angle_vector(self.angle_triples, bond_angles)
+
         return self.conformer
+
 
     def statebatch2proxy(self, states: List[List]) -> npt.NDArray:
         """
