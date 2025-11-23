@@ -2,7 +2,24 @@
 
 This repository implements the experiments described in [Towards equilibrium molecular conformation generation with GFlowNets](https://arxiv.org/abs/2310.14782) by Volokhova & Koziarski et al.
 
+---
+
+## IFT6760B A25 Project Work (our fork)
+
+This repository is a **fork** of `GFNOrg/conf-gfn` used for the IFT6760 A25
+project on sampling full intrinsic coordinates (torsions, bond angles and
+bond lengths) with GFlowNets.
+
+### Recommended setup
+
+For reproducing our experiments, we recommend creating a fresh environment
+and installing the packages listed in `requirements.txt`:
+
 ## Installation
+
+The commands below are the original installation instructions from the
+Conf-GFlowNet repository. They assume a **Linux** machine with an
+**NVIDIA GPU (CUDA 11.7)**:
 
 ```bash
 conda create -n confgfn python=3.8
@@ -26,6 +43,23 @@ python -m pip install numpy pandas hydra-core tqdm torchtyping six xtb scikit-le
 python -m pip install -U --no-deps pytorch3d==0.3.0
 ```
 
+For other environments (e.g. macOS, Windows, or Linux/CPU-only), a
+simpler setup that we use in this fork is:
+
+Python 3.8.20
+
+Conda environment name: confgfn
+
+```bash
+# Create and activate the environment
+conda create -n confgfn python=3.8
+conda activate confgfn
+
+# Install the exact dependencies used in this fork
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
 ## Training
 
 Example command to train a Conf-GFlowNet on the specific molecule `CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O` and TorchANI as the energy proxy estimator for the reward:
@@ -34,14 +68,14 @@ Example command to train a Conf-GFlowNet on the specific molecule `CC(C)Cc1ccc(c
 python main.py +experiments=ai4mat23/mlp_torchani device=cpu 'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"' proxy=conformers/torchani logger.do.online=True user.logdir.root=logs
 ```
 
-Where:  
+Where:
 
-- `+experiments=ai4mat23/mlp_torchani` points to a config file with hyperparameters defined (see [here](https://github.com/GFNOrg/conf-gfn/blob/main/config/experiments/ai4mat23/mlp_torchani.yaml)).  
-- `device=cpu` specifies the device (`cpu` or `cuda`).  
-- `'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"'` specifies the SMILES of a molecule. Alternatively, you can use `env.smiles=ID`, e.g. `env.smiles=0`, to run on one of the [predefined molecules](https://github.com/GFNOrg/conf-gfn/blob/main/gflownet/envs/conformers/conformer.py) used in the experiments described in the paper.  
-- `proxy=conformers/torchani` denotes the proxy model: either `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.  
-- `logger.do.online=True` whether to log the results to wandb.  
-- `user.logdir.root=logs` points to a directory in which log files will be stored.  
+- `+experiments=ai4mat23/mlp_torchani` points to a config file with hyperparameters defined (see [here](https://github.com/GFNOrg/conf-gfn/blob/main/config/experiments/ai4mat23/mlp_torchani.yaml)).
+- `device=cpu` specifies the device (`cpu` or `cuda`).
+- `'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"'` specifies the SMILES of a molecule. Alternatively, you can use `env.smiles=ID`, e.g. `env.smiles=0`, to run on one of the [predefined molecules](https://github.com/GFNOrg/conf-gfn/blob/main/gflownet/envs/conformers/conformer.py) used in the experiments described in the paper.
+- `proxy=conformers/torchani` denotes the proxy model: either `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
+- `logger.do.online=True` whether to log the results to wandb.
+- `user.logdir.root=logs` points to a directory in which log files will be stored.
 
 ## Citation
 
