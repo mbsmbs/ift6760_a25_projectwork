@@ -10,11 +10,6 @@ This repository is a **fork** of `GFNOrg/conf-gfn` used for the IFT6760 A25
 project on sampling full intrinsic coordinates (torsions, bond angles and
 bond lengths) with GFlowNets.
 
-### Recommended setup
-
-For reproducing our experiments, we recommend creating a fresh environment
-and installing the packages listed in `requirements.txt`:
-
 ## Installation
 
 The commands below are the original installation instructions from the
@@ -43,12 +38,11 @@ python -m pip install numpy pandas hydra-core tqdm torchtyping six xtb scikit-le
 python -m pip install -U --no-deps pytorch3d==0.3.0
 ```
 
-For other environments (e.g. macOS, Windows, or Linux/CPU-only), a
-simpler setup that we use in this fork is:
+### Recommended setup
 
-Python 3.8.20
+To reproduce our experiments, create a new environment and install the dependencies specified in requirements.txt
 
-Conda environment name: confgfn
+For other environments (e.g. macOS, Windows, or Linux/CPU-only), a simpler setup that we use in this fork is:
 
 ```bash
 # Create and activate the environment
