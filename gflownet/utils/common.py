@@ -21,17 +21,71 @@ def set_device(device: Union[str, torch.device]):
         return torch.device("cpu")
 
 
-def set_float_precision(precision: Union[int, torch.dtype]):
-    if isinstance(precision, torch.dtype):
-        return precision
-    if precision == 16:
-        return torch.float16
-    elif precision == 32:
-        return torch.float32
-    elif precision == 64:
-        return torch.float64
-    else:
+# def set_float_precision(precision: Union[int, torch.dtype]):
+#     if isinstance(precision, torch.dtype):
+#         return precision
+#     if precision == 16:
+#         return torch.float16
+#     elif precision == 32:
+#         return torch.float32
+#     elif precision == 64:
+#         return torch.float64
+#     else:
+#         raise ValueError("Precision must be one of [16, 32, 64]")
+
+def set_float_precision(float_precision):
+    """
+    Normalize a float precision spec to a torch.dtype.
+
+    Accepts:
+      - int: 16, 32, 64
+      - str: 'float16', 'float32', 'float64', 'half', 'float', 'double'
+      - torch.dtype: returned as is
+      - None: defaults to torch.float32
+    """
+
+    # Case 1: already a torch.dtype (e.g. torch.float32)
+    if isinstance(float_precision, torch.dtype):
+        return float_precision
+
+    # Case 2: string, e.g. 'float32', 'double', 'float'
+    if isinstance(float_precision, str):
+        fp = float_precision.lower()
+        mapping_str = {
+            "float16": torch.float16,
+            "half": torch.float16,
+            "float32": torch.float32,
+            "float": torch.float32,
+            "float64": torch.float64,
+            "double": torch.float64,
+        }
+        if fp in mapping_str:
+            return mapping_str[fp]
+        raise ValueError(
+            "Precision string must be one of "
+            "['float16', 'float32', 'float64', 'half', 'float', 'double']"
+        )
+
+    # Case 3: integer, e.g. 16, 32, 64
+    if isinstance(float_precision, int):
+        mapping_int = {
+            16: torch.float16,
+            32: torch.float32,
+            64: torch.float64,
+        }
+        if float_precision in mapping_int:
+            return mapping_int[float_precision]
         raise ValueError("Precision must be one of [16, 32, 64]")
+
+    # Case 4: None → default to float32
+    if float_precision is None:
+        return torch.float32
+
+    # Anything else is unexpected
+    raise TypeError(
+        f"float_precision must be int, str, torch.dtype or None, "
+        f"got {type(float_precision)}"
+    )
 
 
 def set_int_precision(precision: Union[int, torch.dtype]):

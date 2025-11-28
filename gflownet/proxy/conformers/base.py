@@ -59,16 +59,44 @@ class MoleculeEnergyBase(Proxy, ABC):
     def compute_energy(self, states: List) -> Tensor:
         pass
 
+    # def __call__(self, states: List) -> Tensor:
+    #     energies = self.compute_energy(states)
+
+    #     if self.clamp:
+    #         energies = energies.clamp(self.min_energy, self.max_energy)
+
+    #     energies = energies - self.max_energy
+
+    #     if self.normalize:
+    #         energies = energies / (self.max_energy - self.min_energy)
+
+    #     return energies
+
     def __call__(self, states: List) -> Tensor:
+        # 1) Compute raw energies from the proxy (TorchANI, etc.)
         energies = self.compute_energy(states)
 
-        if self.clamp:
-            energies = energies.clamp(self.min_energy, self.max_energy)
+        # We keep references to the *original* bounds for shifting/normalization
+        min_e = getattr(self, "min_energy", None)
+        max_e = getattr(self, "max_energy", None)
 
-        energies = energies - self.max_energy
+        # 2) Optional clamping, but only if at least one bound is provided
+        if self.clamp and (min_e is not None or max_e is not None):
+            # For clamp, PyTorch requires at least one of min/max to be non-None.
+            # If one bound is missing, we replace it with ±inf.
+            clamp_min = min_e if min_e is not None else -float("inf")
+            clamp_max = max_e if max_e is not None else float("inf")
+            energies = energies.clamp(min=clamp_min, max=clamp_max)
 
-        if self.normalize:
-            energies = energies / (self.max_energy - self.min_energy)
+        # 3) Optional shift by max_energy (only if it is defined)
+        if max_e is not None:
+            energies = energies - max_e
+
+        # 4) Optional normalization to [0, 1]–like range, only if both bounds exist
+        if self.normalize and (min_e is not None and max_e is not None):
+            denom = max_e - min_e
+            if denom != 0:
+                energies = energies / denom
 
         return energies
 

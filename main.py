@@ -51,6 +51,19 @@ def main(config):
         device=config.device,
         float_precision=config.float_precision,
     )
+
+    # --- DEBUG: print internal DOFs ---
+    print("\n[DEBUG] Conformer env from main.py")
+    print("  SMILES:", getattr(env, "smiles", "<unknown>"))
+    print("  n_dim (internal DOFs):", getattr(env, "n_dim", "<no n_dim>"))
+    if hasattr(env, "n_torsion"):
+        print("    -> torsions:     ", env.n_torsion)
+    if hasattr(env, "n_bond_length"):
+        print("    -> bond lengths: ", env.n_bond_length)
+    if hasattr(env, "n_bond_angle"):
+        print("    -> bond angles:  ", env.n_bond_angle)
+    print()
+
     # The policy is used to model the probability of a forward/backward action
     forward_config = parse_policy_config(config, kind="forward")
     backward_config = parse_policy_config(config, kind="backward")
