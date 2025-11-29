@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 antlr4-python3-runtime==4.9.3
 certifi==2025.11.12
-cffi @ file:///Users/runner/miniforge3/conda-bld/cffi_1723018415758/work
+cffi
 charset-normalizer==3.4.4
 click==8.1.8
 cloudpickle==3.1.2
@@ -9,7 +9,7 @@ contourpy==1.1.1
 corner==2.2.1
 cycler==0.12.1
 Cython==3.2.1
-dgl==1.1.2
+dgl==2.0.0+computecanada
 dgllife==0.3.2
 eval_type_backport==0.3.0
 filelock==3.16.1
@@ -31,23 +31,23 @@ MarkupSafe==2.1.5
 matplotlib==3.7.5
 mpmath==1.3.0
 networkx==3.1
-numpy @ file:///Users/runner/miniforge3/conda-bld/numpy_1687808433287/work
+numpy
 omegaconf==2.3.0
 packaging==25.0
-pandas==2.0.3
+pandas==2.0.2
 pillow==10.4.0
 platformdirs==4.3.6
 protobuf==5.29.5
 psutil==7.1.3
 py4j==0.10.9.9
-pycparser @ file:///home/conda/feedstock_root/build_artifacts/pycparser_1711811537435/work
+pycparser
 pydantic==2.10.6
 pydantic_core==2.27.2
 pyparsing==3.1.4
 python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.3
-rdkit-pypi==2022.9.5
+# rdkit - not available via pip, install via conda: conda install -c conda-forge rdkit
 requests==2.32.4
 scikit-learn==1.3.2
 scipy==1.10.1
@@ -56,7 +56,7 @@ six==1.17.0
 smmap==5.0.2
 sympy==1.13.3
 threadpoolctl==3.5.0
-torch==2.0.0
+torch==2.1.1+computecanada
 torchani==2.2.3
 torchdata==0.8.0
 torchtyping==0.1.5
@@ -66,6 +66,6 @@ typing_extensions==4.13.2
 tzdata==2025.2
 ultranest==4.4.0
 urllib3==2.2.3
-wandb==0.23.0
+wandb>=0.16.0
 wurlitzer==3.1.1
 zipp==3.20.2

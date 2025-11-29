@@ -174,7 +174,8 @@ class Conformer(ContinuousTorus):
         self.set_conformer()
 
         # ------------------------------------------------------------------
-        # Internal coordinates meta-data: torsions, flex bond lengths/angles
+        # Internal coordinates meta-data: bond lengths, bond angles, torsions
+        # State order: [r_1, ..., r_M, θ_1, ..., θ_K, φ_1, ..., φ_L]
         # ------------------------------------------------------------------
         # torsions used as DOFs
         self.n_torsion_angles = len(self.torsion_angles)
@@ -206,8 +207,9 @@ class Conformer(ContinuousTorus):
         self.angle_scale = 0.3     # rad per latent unit
 
         # Total internal DOF dimension *without* time:
+        # Order: [bond_lengths, bond_angles, torsion_angles]
         internal_dim = (
-            self.n_torsion_angles + self.n_bond_lengths + self.n_bond_angles
+            self.n_bond_lengths + self.n_bond_angles + self.n_torsion_angles
         )
 
         # Conversions
@@ -237,7 +239,7 @@ class Conformer(ContinuousTorus):
         if remove_hs:
             self.graph = dgl.remove_nodes(self.graph, self.hs)
 
-        # IMPORTANT: the torus dimension is now torsions + lengths + angles
+        # IMPORTANT: the torus dimension is now bond_lengths + bond_angles + torsions
         super().__init__(n_dim=internal_dim, **kwargs)
 
         # initialize RDKit geometry to match the initial state
@@ -304,11 +306,17 @@ class Conformer(ContinuousTorus):
         Map a torus state to the RDKitConformer.
 
         State can be either:
-          - [θ_0, ..., θ_{n_tors-1},
-             z_len_0, ..., z_len_{n_len-1},
-             z_ang_0, ..., z_ang_{n_ang-1}]            (length = internal_dim)
+          - [r_0, ..., r_{M-1},                    # bond lengths (Å)
+             θ_0, ..., θ_{K-1},                    # bond angles (radians)
+             φ_0, ..., φ_{L-1}]                    # torsion angles (radians)
+             (length = internal_dim)
         or
           - same as above plus a final time coord t:  (length = internal_dim + 1)
+        
+        Where:
+          - M = n_bond_lengths
+          - K = n_bond_angles  
+          - L = n_torsion_angles
         """
         if state is None:
             state = self.state
@@ -316,9 +324,9 @@ class Conformer(ContinuousTorus):
         state = np.asarray(state, dtype=float)
 
         internal_dim = (
-            self.n_torsion_angles
-            + self.n_bond_lengths
+            self.n_bond_lengths
             + self.n_bond_angles
+            + self.n_torsion_angles
         )
 
         if state.shape[0] == internal_dim + 1:
@@ -332,29 +340,27 @@ class Conformer(ContinuousTorus):
                 f"got {state.shape[0]}"
             )
 
-        # Split into torsions / bond lengths / bond angles
-        k0 = self.n_torsion_angles
-        k1 = k0 + self.n_bond_lengths
-        k2 = k1 + self.n_bond_angles
+        # Split into bond lengths / bond angles / torsions
+        # Order: [r_0, ..., r_{M-1}, θ_0, ..., θ_{K-1}, φ_0, ..., φ_{L-1}]
+        k0 = self.n_bond_lengths
+        k1 = k0 + self.n_bond_angles
+        k2 = k1 + self.n_torsion_angles
 
-        z_tors = internal[:k0]
-        z_len = internal[k0:k1] if self.n_bond_lengths > 0 else None
-        z_ang = internal[k1:k2] if self.n_bond_angles > 0 else None
+        bond_lengths = internal[:k0] if self.n_bond_lengths > 0 else None
+        bond_angles = internal[k0:k1] if self.n_bond_angles > 0 else None
+        torsion_angles = internal[k1:k2] if self.n_torsion_angles > 0 else None
+
+        # --- Bond lengths: interpret directly as lengths in Å ---
+        if self.n_bond_lengths > 0 and bond_lengths is not None:
+            self.conformer.set_bond_length_vector(self.flex_bond_lengths, bond_lengths)
+
+        # --- Bond angles: interpret directly as angles in radians ---
+        if self.n_bond_angles > 0 and bond_angles is not None:
+            self.conformer.set_angle_vector(self.flex_bond_angles, bond_angles)
 
         # --- Torsions: interpret directly as angles in radians ---
-        if self.n_torsion_angles > 0:
-            self.conformer.set_torsion_vector(self.torsion_angles, z_tors)
-
-        # --- Bond lengths / angles: offsets around reference geometry ---
-        if self.n_bond_lengths > 0 and z_len is not None:
-            # self.ref_bond_lengths in Å, z_len is dimensionless
-            new_lengths = self.ref_bond_lengths + self.length_scale * z_len
-            self.conformer.set_bond_length_vector(self.flex_bond_lengths, new_lengths)
-
-        if self.n_bond_angles > 0 and z_ang is not None:
-            # self.ref_bond_angles in radians, z_ang is dimensionless
-            new_angles = self.ref_bond_angles + self.angle_scale * z_ang
-            self.conformer.set_angle_vector(self.flex_bond_angles, new_angles)
+        if self.n_torsion_angles > 0 and torsion_angles is not None:
+            self.conformer.set_torsion_vector(self.torsion_angles, torsion_angles)
 
         return self.conformer
 
