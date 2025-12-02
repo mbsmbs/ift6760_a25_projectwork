@@ -26,19 +26,49 @@ class AlanineDipeptide(ContinuousTorus):
             path_to_dataset, url_to_dataset
         )
         atom_positions = self.atom_positions_dataset.sample()
+
         self.conformer = RDKitConformer(
-            atom_positions, constants.ad_smiles, constants.ad_free_tas
+            atom_positions,
+            constants.ad_smiles,
+            freely_rotatable_tas=constants.ad_free_tas,
+            variable_bonds=constants.ad_bond_list,
+            variable_angles=constants.ad_angle_list,
         )
+
+        self.n_torsions = len(self.conformer.freely_rotatable_tas)
+        self.n_angles = len(self.conformer.variable_angles)
+        self.n_bonds = len(self.conformer.variable_bonds)
         n_dim = len(self.conformer.freely_rotatable_tas)
-        super().__init__(**kwargs)
+        super().__init__(n_dim=n_dim,**kwargs)
         self.sync_conformer_with_state()
 
     def sync_conformer_with_state(self, state: List = None):
         if state is None:
             state = self.state
+
+        # In this codebase, the last entry is often "n_actions" etc.
+        # If that is true for this env, drop it:
+        vec = state[:-1] if len(state) == self.n_dim + 1 else state
+
+        # Split into blocks
+        t_part = vec[:self.n_torsions]
+        a_part = vec[self.n_torsions:self.n_torsions + self.n_angles]
+        l_part = vec[self.n_torsions + self.n_angles:]
+
+        # Torsions
         for idx, ta in enumerate(self.conformer.freely_rotatable_tas):
-            self.conformer.set_torsion_angle(ta, state[idx])
+            self.conformer.set_torsion_angle(ta, t_part[idx])
+
+        # Bond angles
+        for idx, ang in enumerate(self.conformer.variable_angles):
+            self.conformer.set_bond_angle(ang, a_part[idx])
+
+        # Bond lengths
+        for idx, bond in enumerate(self.conformer.variable_bonds):
+            self.conformer.set_bond_length(bond, l_part[idx])
+
         return self.conformer
+
 
     def statetorch2proxy(self, states: TensorType["batch", "state_dim"]) -> npt.NDArray:
         """
