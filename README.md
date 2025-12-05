@@ -71,17 +71,6 @@ Where:
 - `logger.do.online=True` whether to log the results to wandb.
 - `user.logdir.root=logs` points to a directory in which log files will be stored.
 
-## Citation
-
-```bibtex
-@article{volokhova2023towards,
-  title={Towards equilibrium molecular conformation generation with GFlowNets},
-  author={Volokhova, Alexandra and Koziarski, Micha{\l} and Hern{\'a}ndez-Garc{\'\i}a, Alex and Liu, Cheng-Hao and Miret, Santiago and Lemos, Pablo and Thiede, Luca and Yan, Zichao and Aspuru-Guzik, Al{\'a}n and Bengio, Yoshua},
-  journal={arXiv preprint arXiv:2310.14782},
-  year={2023}
-}
-```
-
 ## Acknowledgment
 
 This repository is based on (and would not be possible without) [github.com/alexhernandezgarcia/gflownet](https://github.com/alexhernandezgarcia/gflownet/), a library for all of your GFlowNet needs.
