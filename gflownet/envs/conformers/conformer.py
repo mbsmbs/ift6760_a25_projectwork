@@ -243,23 +243,6 @@ class Conformer(ContinuousTorus):
         # initialize RDKit geometry to match the initial state
         self.sync_conformer_with_state()
 
-    # ----- New ------
-    def _get_torsion_linear_counts(self):
-        """
-        Backward-compatibility helper used by the original GFlowNet code.
-
-        It returns, for each internal degree of freedom, how many "linear"
-        scalar variables we use to represent it.
-
-        In our extended env, every internal DOF (torsion, bond length, bond angle)
-        is represented by exactly one scalar in the state, so we just return 1
-        for each dimension.
-        """
-        # self.n_dim is defined by ContinuousTorus and is equal to
-        # n_torsion_angles + n_bond_lengths + n_bond_angles here.
-        return np.ones(self.n_dim, dtype=int)
-    # ----------------
-
     # ------- New --------
     def energy_to_log_reward(self, energies: torch.Tensor) -> torch.Tensor:
         """
