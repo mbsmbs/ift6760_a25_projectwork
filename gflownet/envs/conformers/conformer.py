@@ -243,6 +243,61 @@ class Conformer(ContinuousTorus):
         # initialize RDKit geometry to match the initial state
         self.sync_conformer_with_state()
 
+    # ----- New ------
+    def _get_torsion_linear_counts(self):
+        """
+        Backward-compatibility helper used by the original GFlowNet code.
+
+        It returns, for each internal degree of freedom, how many "linear"
+        scalar variables we use to represent it.
+
+        In our extended env, every internal DOF (torsion, bond length, bond angle)
+        is represented by exactly one scalar in the state, so we just return 1
+        for each dimension.
+        """
+        # self.n_dim is defined by ContinuousTorus and is equal to
+        # n_torsion_angles + n_bond_lengths + n_bond_angles here.
+        return np.ones(self.n_dim, dtype=int)
+    # ----------------
+
+    # ------- New --------
+    def energy_to_log_reward(self, energies: torch.Tensor) -> torch.Tensor:
+        """
+        Map TorchANI energies -> log-reward in a numerically stable way.
+
+        energies: shape (batch,)
+        returns: logR: shape (batch,)
+        """
+        # 1) Use the *best* energy in the current batch as reference
+        #    (or use a fixed reference if you prefer)
+        E_ref = energies.min()
+
+        # 2) ΔE >= 0 (higher energy = worse)
+        deltaE = energies - E_ref
+
+        # 3) Clip very bad conformers so we don't get exp(huge)
+        max_delta = getattr(self, "reward_max_delta", 20.0)
+        deltaE = torch.clamp(deltaE, 0.0, max_delta)
+
+        # 4) Log-reward: exp(-β ΔE)
+        beta = getattr(self, "reward_beta", 0.5)
+        logR = -beta * deltaE
+        return logR
+
+    def energy_to_reward(self, energies: torch.Tensor) -> torch.Tensor:
+        """
+        Convert energies to *positive* rewards, but keep them in a reasonable range.
+        """
+        logR = self.energy_to_log_reward(energies)
+        R = torch.exp(logR)
+
+        # Optional: floor & maybe rescale
+        floor = getattr(self, "reward_floor", 1e-6)
+        R = torch.clamp(R, min=floor)
+
+        return R
+    #------------------------
+
     def set_conformer(self, state: Optional[List] = None) -> RDKitConformer:
         """
         Create a fresh RDKitConformer from the current atom_positions/smiles/torsions.

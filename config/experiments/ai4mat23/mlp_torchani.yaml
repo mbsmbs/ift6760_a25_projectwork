@@ -8,6 +8,24 @@ defaults:
    - override /logger: wandb
 
 # Environment
+# env:
+#   smiles: CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O
+#   n_torsion_angles: -1
+#   length_traj: 5
+#   policy_encoding_dim_per_angle: 10
+#   policy_type: mlp
+#   n_comp: 5
+#   vonmises_min_concentration: 4
+#   reward_func: boltzmann
+#   reward_beta: 32
+#   reward_sampling_method: nested
+#   buffer:
+#     replay_capacity: 1000
+#     # To enable KDE plots, change this to `type: grid` (`n: 1000` was used in the original experiments).
+#     test:
+#       type: random
+#       seed: 0
+#       n: 4096
 env:
   smiles: CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O
   n_torsion_angles: -1
@@ -16,16 +34,21 @@ env:
   policy_type: mlp
   n_comp: 5
   vonmises_min_concentration: 4
+
+  # Reward / proxy → env bridge
   reward_func: boltzmann
-  reward_beta: 32
+  reward_beta: 4          # maybe start smaller than 32 for stability
   reward_sampling_method: nested
+  reward_max_delta: 20.0  # new: clip ΔE before exp(-βΔE)
+  reward_floor: 1e-6      # new: min positive reward
+
   buffer:
     replay_capacity: 1000
-    # To enable KDE plots, change this to `type: grid` (`n: 1000` was used in the original experiments).
     test:
       type: random
       seed: 0
       n: 4096
+
 
 # GFlowNet hyperparameters
 gflownet:

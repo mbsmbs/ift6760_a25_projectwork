@@ -16,6 +16,9 @@ class MoleculeEnergyBase(Proxy, ABC):
         normalize: bool = True,
         remove_outliers: bool = True,
         clamp: bool = True,
+        beta: float = 0.5,
+        max_delta: float = 20.0,
+        reward_floor: float = 1e-6,
         **kwargs,
     ):
         """
@@ -51,9 +54,15 @@ class MoleculeEnergyBase(Proxy, ABC):
         self.normalize = normalize
         self.remove_outliers = remove_outliers
         self.clamp = clamp
+        # bounds estimated in setup()
         self.max_energy = None
         self.min_energy = None
         self.min = None
+
+        # NEW: parameters for Boltzmann-style reward mapping
+        self.beta = beta
+        self.max_delta = max_delta
+        self.reward_floor = reward_floor
 
     @abstractmethod
     def compute_energy(self, states: List) -> Tensor:
@@ -73,32 +82,42 @@ class MoleculeEnergyBase(Proxy, ABC):
     #     return energies
 
     def __call__(self, states: List) -> Tensor:
-        # 1) Compute raw energies from the proxy (TorchANI, etc.)
+        """
+        Default behaviour: return (optionally normalized) energies.
+
+        - `compute_energy` returns raw energies from TorchANI (in Hartree).
+        - `setup()` estimates min_energy / max_energy on random samples.
+        - Here we optionally clamp + shift + normalize, just like the original code,
+          but with some safeguards for missing bounds.
+        """
         energies = self.compute_energy(states)
 
-        # We keep references to the *original* bounds for shifting/normalization
-        min_e = getattr(self, "min_energy", None)
-        max_e = getattr(self, "max_energy", None)
+        min_e = self.min_energy
+        max_e = self.max_energy
 
-        # 2) Optional clamping, but only if at least one bound is provided
-        if self.clamp and (min_e is not None or max_e is not None):
-            # For clamp, PyTorch requires at least one of min/max to be non-None.
-            # If one bound is missing, we replace it with ±inf.
-            clamp_min = min_e if min_e is not None else -float("inf")
-            clamp_max = max_e if max_e is not None else float("inf")
-            energies = energies.clamp(min=clamp_min, max=clamp_max)
+        # If setup() was not called, fail loudly instead of doing nonsense.
+        if min_e is None or max_e is None:
+            raise RuntimeError(
+                "MoleculeEnergyBase: min_energy/max_energy are not set. "
+                "Did you forget to call proxy.setup(env) before using the proxy?"
+            )
 
-        # 3) Optional shift by max_energy (only if it is defined)
-        if max_e is not None:
-            energies = energies - max_e
+        # 1) Optional clamping
+        if self.clamp:
+            energies = energies.clamp(min_e, max_e)
 
-        # 4) Optional normalization to [0, 1]–like range, only if both bounds exist
-        if self.normalize and (min_e is not None and max_e is not None):
+        # 2) Shift so that the *best* energy is at 0
+        energies = energies - max_e
+
+        # 3) Optional normalization to [-1, 0]-like range
+        if self.normalize:
             denom = max_e - min_e
             if denom != 0:
                 energies = energies / denom
 
         return energies
+
+
 
     def setup(self, env=None):
         env_states = 2 * np.pi * np.random.rand(self.n_samples, env.n_dim)
