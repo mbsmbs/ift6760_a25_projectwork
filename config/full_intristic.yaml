@@ -1,0 +1,71 @@
+defaults:
+  - _self_
+  - env: grid
+  - gflownet: flowmatch
+  - policy: mlp_${gflownet}
+  - proxy: corners
+  - logger: wandb
+  - user: julia
+
+# Device
+device: cuda
+# Float precision
+float_precision: 32
+# Number of objects to sample at the end of training
+n_samples: 10000
+# Random seeds
+seed: 0
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True
+
+# Full intrinsic coordinates for conformer generation:
+# torsions + flexible bond lengths + flexible bond angles.
+
+_target_: gflownet.envs.conformers.conformer.Conformer
+
+# Provide SMILES of the molecule to model
+smiles: "CC(C(=O)NC)NC(=O)C"   # Alanine dipeptide by default
+
+# Use ALL detected torsions
+n_torsion_angles: -1
+torsion_indices: null
+
+# Internal DOFs added on top of torsions
+# These simply list which coordinates become learnable degrees of freedom.
+
+# Flexible bond lengths: list of (atom_i, atom_j)
+flex_bond_lengths:
+  - [0, 1]
+  - [1, 2]
+  - [2, 3]
+
+# Flexible bond angles: list of (i, j, k) with j central
+flex_bond_angles:
+  - [0, 1, 2]
+  - [1, 2, 3]
+
+# What policy format you want
+policy_type: "mlp"
+
+# Whether to remove hydrogens in the GNN graph
+remove_hs: true
+
+# Parameters inherited from ContinuousTorus
+min: -3.1415926535
+max: 3.1415926535
+temperature: 1.0
+
+# Replay buffer size & batch size
+buffer:
+  capacity: 100000
+batch_size: 256

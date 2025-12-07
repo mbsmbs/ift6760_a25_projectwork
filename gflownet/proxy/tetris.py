@@ -1,5 +1,10 @@
 import torch
-from torchtyping import TensorType
+#from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.proxy.base import Proxy
 

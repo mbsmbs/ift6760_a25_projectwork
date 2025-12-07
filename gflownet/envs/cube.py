@@ -11,8 +11,12 @@ import numpy as np
 import torch
 from sklearn.neighbors import KernelDensity
 from torch.distributions import Bernoulli, Beta, Categorical, MixtureSameFamily
-from torchtyping import TensorType
-
+#from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 from gflownet.envs.base import GFlowNetEnv
 from gflownet.utils.common import copy, tbool, tfloat
 

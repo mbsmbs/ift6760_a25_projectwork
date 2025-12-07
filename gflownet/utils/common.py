@@ -9,8 +9,13 @@ import torch
 from hydra import compose, initialize_config_dir
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import OmegaConf
-from torchtyping import TensorType
+# from torchtyping import TensorType
 
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 def set_device(device: Union[str, torch.device]):
     if isinstance(device, torch.device):

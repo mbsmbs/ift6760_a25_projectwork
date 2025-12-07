@@ -9,7 +9,12 @@ from typing import List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 import torch
-from torchtyping import TensorType
+# from torchtyping import TensorType  
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.envs.base import GFlowNetEnv
 from gflownet.utils.common import set_device, tint

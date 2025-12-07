@@ -1,0 +1,6 @@
+- env=conformers/conformer
+- policy=heterogeneous
+- proxy=molecule
+- gflownet=trajectorybalance
+- env.buffer.test.n=1
+- gflownet.optimizer.batch_size.forward=16

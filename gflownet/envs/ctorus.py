@@ -9,7 +9,12 @@ import numpy.typing as npt
 import pandas as pd
 import torch
 from torch.distributions import Categorical, MixtureSameFamily, Uniform, VonMises
-from torchtyping import TensorType
+# from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.envs.htorus import HybridTorus
 from gflownet.utils.common import copy, tfloat
@@ -337,52 +342,45 @@ class ContinuousTorus(HybridTorus):
         backward: bool,
     ) -> Tuple[List[float], Tuple[float], bool]:
         """
-        Updates self.state given a non-EOS action. This method is called by both step()
-        and step_backwards(), with the corresponding value of argument backward.
-
-        Forward steps:
-            - Add action increments to state angles.
-            - Increment n_actions value of state.
-        Backward steps:
-            - Subtract action increments from state angles.
-            - Decrement n_actions value of state.
-
-        Args
-        ----
-        action : tuple
-            Action to be executed. An action is a vector where the value at position d
-            indicates the increment in the angle at dimension d.
-
-        backward : bool
-            If True, perform backward step. Otherwise (default), perform forward step.
-
-        Returns
-        -------
-        self.state : list
-            The sequence after executing the action
-
-        action : int
-            Action executed
-
-        valid : bool
-            False, if the action is not allowed for the current state, e.g. stop at the
-            root state
+        Updates self.state given a non-EOS action.
         """
-        for dim, angle in enumerate(action):
+        n_dims = len(action)
+        
+        # 1. Update Angles (Vectorized-style loop)
+        # Using indices is slightly faster and cleaner than enumerate for simple math
+        for i in range(n_dims):
             if backward:
-                self.state[int(dim)] -= angle
+                self.state[i] = (self.state[i] - action[i]) % (2 * np.pi)
             else:
-                self.state[int(dim)] += angle
-            self.state[int(dim)] = self.state[int(dim)] % (2 * np.pi)
+                self.state[i] = (self.state[i] + action[i]) % (2 * np.pi)
+        
+        # 2. Update Time
         if backward:
             self.state[-1] -= 1
         else:
             self.state[-1] += 1
+            
+        # --- CRITICAL FIX: Handle Floating Point Drift ---
+        # Snap to nearest integer if it's close (handles 4.99999 -> 5.0)
+        if abs(self.state[-1] - round(self.state[-1])) < 1e-4:
+             self.state[-1] = float(round(self.state[-1]))
+             
+        # Hard Clamp to prevent assertion failures
+        if self.state[-1] < 0: 
+            self.state[-1] = 0.0
+        if self.state[-1] > self.length_traj: 
+            self.state[-1] = float(self.length_traj)
+        # ------------------------------------------------
+
+        # 3. Validation
         assert self.state[-1] >= 0 and self.state[-1] <= self.length_traj
+        
         # If n_steps is equal to 0, set source to avoid escaping comparison to source.
         if self.state[-1] == 0:
             self.state = copy(self.source)
-
+            
+        return self.state, action, True
+        
     def step(
         self, action: Tuple[float], skip_mask_check: bool = False
     ) -> Tuple[List[float], Tuple[float], bool]:

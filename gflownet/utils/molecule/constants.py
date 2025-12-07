@@ -28,3 +28,16 @@ ad_smiles = "CC(C(=O)NC)NC(=O)C"
 
 # Freely rotatable torsion angles
 ad_free_tas = ((0, 1, 2, 3), (0, 1, 6, 7))
+
+ad_free_bond_angles = (
+    (0, 1, 2),
+    (1, 2, 3),
+    (1, 2, 6),
+)
+
+# Freely variable bond lengths (pairs of atom indices)
+ad_free_bond_lengths = (
+    (1, 2),
+    (2, 3),
+    (2, 6),
+)

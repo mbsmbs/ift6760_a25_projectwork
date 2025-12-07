@@ -1,0 +1,183 @@
+device: cuda
+float_precision: 32
+n_samples: 1000
+seed: 0
+env:
+  _target_: gflownet.envs.conformers.conformer.Conformer
+  reward_func: boltzmann
+  reward_min: 1.0e-08
+  reward_beta: 32
+  reward_norm: 1.0
+  reward_norm_std_mult: 0.0
+  proxy_state_format: oracle
+  skip_mask_check: false
+  conditional: false
+  continuous: false
+  buffer:
+    replay_capacity: 1000
+    train: null
+    test:
+      path: null
+      type: random
+      seed: 0
+      'n': 0
+      output_csv: conformer_test.csv
+      output_pkl: conformer_test.pkl
+    data_path: null
+  smiles: CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O
+  n_torsion_angles: -1
+  flex_bond_lengths:
+  - - 0
+    - 1
+  - - 1
+    - 2
+  - - 1
+    - 3
+  - - 3
+    - 4
+  - - 7
+    - 10
+  - - 10
+    - 11
+  - - 10
+    - 12
+  - - 12
+    - 14
+  flex_bond_angles:
+  - - 0
+    - 1
+    - 2
+  - - 0
+    - 1
+    - 3
+  - - 2
+    - 1
+    - 3
+  - - 1
+    - 3
+    - 4
+  - - 3
+    - 4
+    - 5
+  - - 7
+    - 10
+    - 11
+  - - 7
+    - 10
+    - 12
+  - - 10
+    - 12
+    - 14
+  length_scale: 0.1
+  angle_scale: 0.4
+  id: conformer
+  policy_type: mlp
+  length_traj: 5
+  reward_sampling_method: nested
+  n_comp: 5
+  vonmises_min_concentration: 4
+  fixed_distribution:
+    vonmises_mean: 0.0
+    vonmises_concentration: 0.5
+  random_distribution:
+    vonmises_mean: 0.0
+    vonmises_concentration: 2.0
+gflownet:
+  _target_: gflownet.gflownet.GFlowNetAgent
+  seed: 0
+  optimizer:
+    loss: trajectorybalance
+    lr: 0.0001
+    lr_decay_period: 1000000
+    lr_decay_gamma: 0.5
+    method: adam
+    early_stopping: 0.0
+    ema_alpha: 0.5
+    adam_beta1: 0.9
+    adam_beta2: 0.999
+    sgd_momentum: 0.9
+    batch_size:
+      forward: 10
+      backward_dataset: 0
+      backward_replay: 0
+    train_to_sample_ratio: 1
+    n_train_steps: 5000
+    bootstrap_tau: 0.0
+    clip_grad_norm: 0.0
+    lr_z_mult: 10
+    z_dim: 16
+  batch_reward: true
+  mask_invalid_actions: true
+  temperature_logits: 1.0
+  random_action_prob: 0.0
+  pct_offline: 0.0
+  replay_capacity: 0
+  replay_sampling: permutation
+  num_empirical_loss: 200000
+  oracle:
+    'n': 500
+  sample_only: false
+  active_learning: false
+policy:
+  shared:
+    type: heterogeneous
+    n_hid: 128
+    n_layers: 3
+  forward:
+    _target_: gflownet.policy.base.Policy
+    config: null
+    checkpoint: null
+  backward:
+    _target_: gflownet.policy.base.Policy
+    config: null
+    checkpoint: null
+    shared_weights: true
+proxy:
+  _target_: gflownet.proxy.molecule.MMFFEnergyProxy
+  device: ${device}
+  float_precision: ${float_precision}
+logger:
+  _target_: gflownet.utils.logger.Logger
+  do:
+    online: false
+    times: false
+  project_name: GFlowNet
+  train:
+    period: 1
+  test:
+    first_it: true
+    period: 100
+    'n': 100
+    kde:
+      bandwidth: 0.1
+      kernel: gaussian
+    n_top_k: 5000
+    top_k: 100
+    top_k_period: -1
+    n_trajs_logprobs: 10
+    logprobs_batch_size: 100
+    max_data_logprobs: 100000.0
+  oracle:
+    period: 100000
+    k:
+    - 1
+    - 10
+    - 100
+  checkpoints:
+    period: 1000
+  logdir:
+    root: ./logs
+    ckpts: ckpts
+    overwrite: true
+  debug: false
+  lightweight: false
+  progress: true
+  context: '0'
+  tags:
+  - gflownet
+user:
+  logdir:
+    root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/logs/gflownet
+  data:
+    root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data
+    alanine_dipeptide: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data/alanine_dipeptide_conformers_1.npy

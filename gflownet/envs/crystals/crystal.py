@@ -4,7 +4,12 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
-from torchtyping import TensorType
+# from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.envs.base import GFlowNetEnv
 from gflownet.envs.crystals.composition import Composition

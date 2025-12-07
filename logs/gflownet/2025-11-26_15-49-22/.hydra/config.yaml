@@ -1,0 +1,126 @@
+device: cuda
+float_precision: 32
+n_samples: 10000
+seed: 0
+env:
+  _target_: gflownet.envs.grid.Grid
+  reward_func: identity
+  reward_min: 1.0e-08
+  reward_beta: 1.0
+  reward_norm: 1.0
+  reward_norm_std_mult: 0.0
+  proxy_state_format: oracle
+  skip_mask_check: false
+  conditional: false
+  continuous: false
+  buffer:
+    replay_capacity: 0
+    train: null
+    test:
+      path: null
+      type: all
+      output_csv: grid_test.csv
+      output_pkl: grid_test.pkl
+    data_path: null
+  id: grid
+  func: corners
+  n_dim: 2
+  length: 3
+  max_increment: 1
+  max_dim_per_action: 1
+  cell_min: -1
+  cell_max: 1
+gflownet:
+  _target_: gflownet.gflownet.GFlowNetAgent
+  seed: 0
+  optimizer:
+    loss: flowmatch
+    lr: 0.0001
+    lr_decay_period: 1000000
+    lr_decay_gamma: 0.5
+    method: adam
+    early_stopping: 0.0
+    ema_alpha: 0.5
+    adam_beta1: 0.9
+    adam_beta2: 0.999
+    sgd_momentum: 0.9
+    batch_size:
+      forward: 10
+      backward_dataset: 0
+      backward_replay: 0
+    train_to_sample_ratio: 1
+    n_train_steps: 5000
+    bootstrap_tau: 0.0
+    clip_grad_norm: 0.0
+  batch_reward: true
+  mask_invalid_actions: true
+  temperature_logits: 1.0
+  random_action_prob: 0.0
+  pct_offline: 0.0
+  replay_capacity: 0
+  replay_sampling: permutation
+  num_empirical_loss: 200000
+  oracle:
+    'n': 500
+  sample_only: false
+  active_learning: false
+policy:
+  _target_: gflownet.policy.base.Policy
+  shared: null
+  forward:
+    type: mlp
+    n_hid: 128
+    n_layers: 2
+    checkpoint: null
+    reload_ckpt: false
+  backward: null
+proxy:
+  _target_: gflownet.proxy.corners.Corners
+  mu: 0.75
+  sigma: 0.05
+  higher_is_better: false
+logger:
+  _target_: gflownet.utils.logger.Logger
+  do:
+    online: false
+    times: false
+  project_name: GFlowNet
+  train:
+    period: 1
+  test:
+    first_it: true
+    period: 100
+    'n': 100
+    kde:
+      bandwidth: 0.1
+      kernel: gaussian
+    n_top_k: 5000
+    top_k: 100
+    top_k_period: -1
+    n_trajs_logprobs: 10
+    logprobs_batch_size: 100
+    max_data_logprobs: 100000.0
+  oracle:
+    period: 100000
+    k:
+    - 1
+    - 10
+    - 100
+  checkpoints:
+    period: 1000
+  logdir:
+    root: ./logs
+    ckpts: ckpts
+    overwrite: true
+  debug: false
+  lightweight: false
+  progress: true
+  context: '0'
+  tags:
+  - gflownet
+user:
+  logdir:
+    root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/logs/gflownet
+  data:
+    root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data
+    alanine_dipeptide: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data/alanine_dipeptide_conformers_1.npy

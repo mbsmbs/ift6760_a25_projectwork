@@ -26,46 +26,53 @@ class AlanineDipeptide(ContinuousTorus):
             path_to_dataset, url_to_dataset
         )
         atom_positions = self.atom_positions_dataset.sample()
-
         self.conformer = RDKitConformer(
             atom_positions,
             constants.ad_smiles,
-            freely_rotatable_tas=constants.ad_free_tas,
-            variable_bonds=constants.ad_bond_list,
-            variable_angles=constants.ad_angle_list,
+            constants.ad_free_tas,
         )
 
-        self.n_torsions = len(self.conformer.freely_rotatable_tas)
-        self.n_angles = len(self.conformer.variable_angles)
-        self.n_bonds = len(self.conformer.variable_bonds)
-        n_dim = len(self.conformer.freely_rotatable_tas)
-        super().__init__(n_dim=n_dim,**kwargs)
+        # Define free internal coordinates
+        self.free_torsions = list(constants.ad_free_tas)
+        self.free_angles = list(constants.ad_free_bond_angles)
+        self.free_lengths = list(constants.ad_free_bond_lengths)
+
+        self.n_torsions = len(self.free_torsions)
+        self.n_angles = len(self.free_angles)
+        self.n_lengths = len(self.free_lengths)
+        self.n_ic = self.n_torsions + self.n_angles + self.n_lengths
+
+        # you may need to pass n_dim to ContinuousTorus if it expects it
+        kwargs.setdefault("n_dim", self.n_ic)
+        super().__init__(**kwargs)
+
         self.sync_conformer_with_state()
 
     def sync_conformer_with_state(self, state: List = None):
         if state is None:
             state = self.state
 
-        # In this codebase, the last entry is often "n_actions" etc.
-        # If that is true for this env, drop it:
-        vec = state[:-1] if len(state) == self.n_dim + 1 else state
+        # ignore the last element (n_actions) as before
+        coords = state[:-1]
 
-        # Split into blocks
-        t_part = vec[:self.n_torsions]
-        a_part = vec[self.n_torsions:self.n_torsions + self.n_angles]
-        l_part = vec[self.n_torsions + self.n_angles:]
+        # 1) torsions
+        torsion_values = coords[: self.n_torsions]
+        # 2) angles
+        angle_values = coords[self.n_torsions : self.n_torsions + self.n_angles]
+        # 3) lengths
+        length_values = coords[self.n_torsions + self.n_angles : self.n_ic]
 
-        # Torsions
-        for idx, ta in enumerate(self.conformer.freely_rotatable_tas):
-            self.conformer.set_torsion_angle(ta, t_part[idx])
+        # apply torsions
+        for val, ta in zip(torsion_values, self.free_torsions):
+            self.conformer.set_torsion_angle(ta, val)
 
-        # Bond angles
-        for idx, ang in enumerate(self.conformer.variable_angles):
-            self.conformer.set_bond_angle(ang, a_part[idx])
+        # apply bond angles
+        for val, (i, j, k) in zip(angle_values, self.free_angles):
+            self.conformer.set_bond_angle(i, j, k, val)
 
-        # Bond lengths
-        for idx, bond in enumerate(self.conformer.variable_bonds):
-            self.conformer.set_bond_length(bond, l_part[idx])
+        # apply bond lengths
+        for val, (i, j) in zip(length_values, self.free_lengths):
+            self.conformer.set_bond_length(i, j, val)
 
         return self.conformer
 

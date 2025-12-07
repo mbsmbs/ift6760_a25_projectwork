@@ -13,7 +13,13 @@ import numpy as np
 import numpy.typing as npt
 import torch
 from torch.distributions import Categorical
-from torchtyping import TensorType
+
+# from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.utils.common import copy, set_device, set_float_precision, tbool, tfloat
 
@@ -607,10 +613,22 @@ class GFlowNetEnv:
             The list of actions (tuples) in the trajectory.
         """
         actions = []
+        loop_counter = 0 # Safety counter
+        
         while self.done is not True:
+            # --- DEBUG START ---
+            
+            loop_counter += 1
+            if loop_counter > 100:
+                print("   [ERROR] Infinite loop detected in trajectory_random!")
+                break
+            # --- DEBUG END ---
+
             _, action, valid = self.step_random()
             if valid:
                 actions.append(action)
+                
+        # print(f"[DEBUG] Final state") 
         return self.state, actions
 
     def get_random_terminating_states(
@@ -647,20 +665,16 @@ class GFlowNetEnv:
         states : list
             A list of randomly sampled terminating states.
         """
-        if unique is False:
-            max_attempts = n_states + 1
         states = []
-        count = 0
-        while len(states) < n_states and count < max_attempts:
-            add = True
-            self.reset()
+        print(f"[DEBUG] Generating {n_states} random states...") 
+        for i in range(n_states):
+            print(f"[DEBUG] Molecule {i+1}/{n_states} starting...") 
             state, _ = self.trajectory_random()
-            if unique is True:
-                if any([self.equal(state, s) for s in states]):
-                    add = False
-            if add is True:
-                states.append(state)
-            count += 1
+            print(f"[DEBUG] State {i+1} generated: {state}")
+            states.append(state)
+            if (i+1) % 10 == 0:
+                 print(f"[DEBUG] Molecule {i+1}/{n_states} done.") 
+        print("[DEBUG] Generation complete.") 
         return states
 
     def get_policy_output(self, params: Optional[dict] = None):

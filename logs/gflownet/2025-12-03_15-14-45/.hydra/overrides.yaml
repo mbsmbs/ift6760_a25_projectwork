@@ -1,0 +1,4 @@
+- env=conformers/conformer
+- policy=heterogeneous
+- proxy=molecule
+- gflownet=trajectorybalance

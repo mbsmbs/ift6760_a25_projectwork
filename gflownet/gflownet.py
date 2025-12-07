@@ -860,6 +860,7 @@ class GFlowNetAgent:
                     n_replay=self.batch_size.backward_replay,
                 )
                 batch.merge(sub_batch)
+            print("batch merged")
             for j in range(self.ttsr):
                 if self.loss == "flowmatch":
                     losses = self.flowmatch_loss(
@@ -892,7 +893,8 @@ class GFlowNetAgent:
             states_term = batch.get_terminating_states(sort_by="trajectory")
             rewards = batch.get_terminating_rewards(sort_by="trajectory")
             actions_trajectories = batch.get_actions_trajectories()
-            proxy_vals = self.env.reward2proxy(rewards).tolist()
+            #proxy_vals = self.env.reward2proxy(rewards).tolist()
+            proxy_vals = self.env.proxy(states_term).tolist()
             rewards = rewards.tolist()
             self.buffer.add(states_term, actions_trajectories, rewards, proxy_vals, it)
             self.buffer.add(
@@ -917,6 +919,7 @@ class GFlowNetAgent:
             )
             # Train logs
             t0_log = time.time()
+            print("calling log_train")
             self.logger.log_train(
                 losses=losses,
                 rewards=rewards,
@@ -996,7 +999,8 @@ class GFlowNetAgent:
         )
         rewards_x_tt = self.env.reward_batch(x_tt)
         corr_prob_traj_rewards = np.corrcoef(
-            np.exp(logprobs_x_tt.cpu().numpy()), rewards_x_tt
+            np.exp(logprobs_x_tt.cpu().numpy()), 
+            rewards_x_tt.cpu().numpy()  
         )[0, 1]
         var_logrewards_logp = torch.var(
             torch.log(tfloat(rewards_x_tt, float_type=self.float, device=self.device))

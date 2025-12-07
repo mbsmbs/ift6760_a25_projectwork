@@ -15,11 +15,27 @@ import random
 import sys
 
 import hydra
+import numpy as np
 import pandas as pd
 
 from gflownet.utils.common import chdir_random_subdir
 from gflownet.utils.policy import parse_policy_config
+from omegaconf import OmegaConf  
+from gflownet.policy.base import Policy  
+from gflownet.proxy.base import Proxy 
+import torch
+torch.distributions.Distribution.set_default_validate_args(False)
 
+# --- PROXY CLASS ---
+# Inherit from Proxy so it has .setup() and other required methods
+class SimpleInitProxy(Proxy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+    def __call__(self, states):
+        # Return a constant energy value. Must be a numpy array of floats.
+        print("call")
+        return np.full(len(states), -50.0, dtype=np.float32)
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
 def main(config):
@@ -38,47 +54,99 @@ def main(config):
 
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
-    # The proxy is required in the env for scoring: might be an oracle or a model
-    proxy = hydra.utils.instantiate(
+
+    # 1. Instantiate the REAL MMFF Proxy
+    real_mmff_proxy = hydra.utils.instantiate(
         config.proxy,
         device=config.device,
         float_precision=config.float_precision,
     )
-    # The proxy is passed to env and used for computing rewards
+    print("real_mmff_proxy")
+    # 2. Instantiate the FAST DUMMY Proxy
+    fast_init_proxy = SimpleInitProxy(
+        device=config.device, 
+        float_precision=config.float_precision
+    )
+    print("fast_init_proxy")
+    # 3. Instantiate Environment using the FAST Proxy (for buffer generation speed)
     env = hydra.utils.instantiate(
         config.env,
-        proxy=proxy,
-        device=config.device,
+        proxy=fast_init_proxy,
+        device="cpu", # Force env to CPU to avoid sync overhead
         float_precision=config.float_precision,
     )
-    # The policy is used to model the probability of a forward/backward action
+    print("env2")
+    # 4. Policy configs
     forward_config = parse_policy_config(config, kind="forward")
     backward_config = parse_policy_config(config, kind="backward")
 
-    forward_policy = hydra.utils.instantiate(
-        forward_config,
-        env=env,
+    # [Policy Instantiation Block - Your previously corrected code]
+    # -------------------------------------------------------------------------
+    # DIRECT INITIALIZATION (With Config Merging)
+    # -------------------------------------------------------------------------
+    
+    fwd_params = OmegaConf.to_container(forward_config, resolve=True)
+    bwd_params = OmegaConf.to_container(backward_config, resolve=True)
+
+    def prepare_config(params):
+        shared = params.pop('config', {}) or {}
+        params.pop('_target_', None)
+        flat_config = shared.copy()
+        flat_config.update(params)
+        return OmegaConf.create(flat_config), params
+
+    fwd_config_obj, fwd_kwargs = prepare_config(fwd_params)
+    bwd_config_obj, bwd_kwargs = prepare_config(bwd_params)
+
+    forward_policy = Policy(
+        config=fwd_config_obj,
+        env=env, # Env uses FAST proxy here
         device=config.device,
         float_precision=config.float_precision,
+        base=None,
+        **fwd_kwargs 
     )
-    backward_policy = hydra.utils.instantiate(
-        backward_config,
-        env=env,
+
+    backward_policy = Policy(
+        config=bwd_config_obj,
+        env=env, # Env uses FAST proxy here
         device=config.device,
         float_precision=config.float_precision,
         base=forward_policy,
+        **bwd_kwargs
     )
-
+    # -------------------------------------------------------------------------
+    # 5. INITIALIZE GFLOWNET (With FAST PROXY still active!)
+    # -------------------------------------------------------------------------
+    print("\n[INFO] Initializing GFlowNet Agent (filling buffer with FAST proxy)...")
+    
     gflownet = hydra.utils.instantiate(
         config.gflownet,
         device=config.device,
         float_precision=config.float_precision,
-        env=env,
+        env=env, # env.proxy is still 'fast_init_proxy' here!
         forward_policy=forward_policy,
         backward_policy=backward_policy,
         buffer=config.env.buffer,
         logger=logger,
     )
+    
+    # -------------------------------------------------------------------------
+    # 6. NOW RESTORE THE REAL PROXY (After Buffer is filled)
+    # -------------------------------------------------------------------------
+    print("[INFO] Buffer filled. Swapping to REAL MMFF proxy for training.")
+    
+    # We must update the proxy in the environment object held by the agent
+    # (Since env is passed by reference, this updates it everywhere)
+    env.proxy = real_mmff_proxy
+    
+    # Just to be safe, update the reference inside the agent explicitly
+    gflownet.env.proxy = real_mmff_proxy
+
+    # -------------------------------------------------------------------------
+    # 7. TRAIN
+    # -------------------------------------------------------------------------
+    print("calling train")
     gflownet.train()
 
     # Sample from trained GFlowNet

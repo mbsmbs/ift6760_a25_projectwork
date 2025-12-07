@@ -1,0 +1,18 @@
+# config/policy/heterogeneous.yaml
+shared:
+  type: "heterogeneous"
+  n_hid: 128
+  n_layers: 3
+
+forward:
+  _target_: gflownet.policy.base.Policy
+  # Placeholder so policy.py can inject the shared config here
+  config: null
+  checkpoint: null
+
+backward:
+  _target_: gflownet.policy.base.Policy
+  # Placeholder
+  config: null
+  checkpoint: null
+  shared_weights: True

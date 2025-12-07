@@ -16,7 +16,12 @@ from networkx.drawing.nx_pydot import graphviz_layout
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.preprocessing import MinMaxScaler
 from torch.distributions import Beta, Categorical, MixtureSameFamily, Uniform
-from torchtyping import TensorType
+#from torchtyping import TensorType
+# Dummy replacement for torchtyping
+class DummyTensorType:
+    def __class_getitem__(cls, item):
+        return object
+TensorType = DummyTensorType
 
 from gflownet.envs.base import GFlowNetEnv
 

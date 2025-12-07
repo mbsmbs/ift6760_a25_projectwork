@@ -1,0 +1,4 @@
+# config/proxy/molecule.yaml
+_target_: gflownet.proxy.molecule.MMFFEnergyProxy
+device: ${device}
+float_precision: ${float_precision}

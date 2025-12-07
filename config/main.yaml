@@ -1,29 +1,27 @@
 defaults:
   - _self_
-  - env: grid
+  # 1. Change env to 'conformer' (we will create this config file below)
+  - env: conformer
   - gflownet: flowmatch
-  - policy: mlp_${gflownet}
-  - proxy: corners
+  # 2. Change policy to a custom config, or override 'mlp' below
+  - policy: heterogeneous
+  # 3. Change proxy to use the MMFF energy
+  - proxy: molecule
   - logger: wandb
-  - user: alex
+  - user: julkuhn
 
 # Device
 device: cuda
-# Float precision
 float_precision: 32
-# Number of objects to sample at the end of training
-n_samples: 10000
-# Random seeds
+n_samples: 100
 seed: 0
 
-# Hydra config
 hydra:
-  # See: https://hydra.cc/docs/configure_hydra/workdir/
   run:
     dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
-  sweep:
-    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
-  job:
+  #sweep:
+    #dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
+  #job:
     # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
     # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    chdir: True
+    #chdir: True

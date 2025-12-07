@@ -1,0 +1,6 @@
+logdir:
+  root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/logs/gflownet
+data:
+  root: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data
+  alanine_dipeptide: /project/aip-irina/julkuhn/ift6760_a25_projectwork/data/alanine_dipeptide_conformers_1.npy
+
