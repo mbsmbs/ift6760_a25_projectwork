@@ -16,9 +16,41 @@ import sys
 
 import hydra
 import pandas as pd
+import numpy as np
+from pathlib import Path
 
 from gflownet.utils.common import chdir_random_subdir
 from gflownet.utils.policy import parse_policy_config
+
+
+import numpy as np  # you already have this somewhere above, keep it
+
+def parse_state_to_array(st):
+    """
+    Convert a replay-buffer 'state' entry to a 1D numpy array of floats.
+
+    Handles:
+      - list/tuple/np.ndarray
+      - string like "[... ...] | 5"
+    """
+    # Already numeric
+    if isinstance(st, (list, tuple, np.ndarray)):
+        return np.asarray(st, dtype=float)
+
+    # String representation: "[... ...] | t"
+    if isinstance(st, str):
+        # Drop the trailing "| t" part if present
+        if "|" in st:
+            coord_part = st.split("|", 1)[0].strip()
+        else:
+            coord_part = st.strip()
+
+        # Remove brackets and split on whitespace
+        coord_part = coord_part.replace("[", " ").replace("]", " ")
+        tokens = coord_part.split()
+        return np.asarray([float(x) for x in tokens], dtype=float)
+
+    raise TypeError(f"Unsupported state type: {type(st)}")
 
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
@@ -115,13 +147,46 @@ def main(config):
             dct, open(f"conformers_{env.smiles}_{type(env.proxy).__name__}.pkl", "wb")
         )
 
-    # Print replay buffer
+        # Print replay buffer
     if len(gflownet.buffer.replay) > 0:
         print("\nReplay buffer:")
         print(gflownet.buffer.replay)
 
+        # ===== Save replay buffer and top states for analysis =====
+        run_dir = Path(cwd)
+
+        rb = gflownet.buffer.replay.copy()
+        # 1) full replay buffer
+        rb.to_pickle(run_dir / "replay_buffer.pkl")
+
+        # 2) top-K lowest-energy states
+        rb_sorted = rb.sort_values("energy")  # lower energy = better
+        K = min(200, len(rb_sorted))
+        top = rb_sorted.head(K)
+
+        # states: list of numpy arrays (ragged allowed)
+        states_list = [parse_state_to_array(st) for st in top["state"]]
+
+        # Try to save as a stacked array *only if* all have same length
+        lengths = {s.shape[0] for s in states_list}
+        if len(lengths) == 1:
+            states_arr = np.stack(states_list)  # (K, state_dim)
+            np.save(run_dir / "top_states.npy", states_arr)
+        else:
+            print(f"[WARN] top states have varying lengths {lengths}, "
+                "skipping save of top_states.npy")
+
+        # proxy states: (Z, x, y, z) per atom — this works fine even with ragged state length
+        proxy_states = env.statebatch2proxy(states_list)  # (K, n_atoms, 4)
+
+        np.save(run_dir / "top_proxy_states.npy", proxy_states)
+        np.save(run_dir / "top_energies.npy", top["energy"].to_numpy())
+
+        print(f"\n[INFO] Saved replay_buffer.pkl and top_* files in {run_dir}\n")
+
     # Close logger
     gflownet.logger.end()
+
 
 
 def set_seeds(seed):

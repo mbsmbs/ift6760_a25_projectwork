@@ -35,10 +35,17 @@ env:
   n_comp: 5
   vonmises_min_concentration: 4
 
-  # NEW: explicitly no flexible bond lengths / angles
-  # Torsion-only
-  flex_bond_lengths: []
-  flex_bond_angles: []
+  # Extended version
+  # bond lengths & bond angles (triples of atom indices)
+  flex_bond_lengths:
+    - [4, 5]
+    - [5, 6]
+    - [7, 8]
+
+  flex_bond_angles:
+    - [3, 4, 5]
+    - [4, 5, 6]
+    - [5, 6, 7]
 
   # Reward / proxy → env bridge
   reward_func: boltzmann

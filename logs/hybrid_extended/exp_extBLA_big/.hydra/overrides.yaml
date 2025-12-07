@@ -1,0 +1,8 @@
+- +experiments=ai4mat23/mlp_torchani_extBLA
+- device=cpu
+- env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"
+- proxy=conformers/torchani
+- logger.do.online=False
+- gflownet.optimizer.n_train_steps=3000
+- gflownet.optimizer.batch_size.forward=64
+- n_samples=256

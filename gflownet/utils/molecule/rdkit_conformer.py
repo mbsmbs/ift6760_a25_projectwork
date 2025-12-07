@@ -54,6 +54,7 @@ class RDKitConformer:
         """
         self.smiles = smiles
         self.rdk_mol = self.get_mol_from_smiles(smiles)
+        self.mol = self.rdk_mol
         self.rdk_conf = self.embed_mol_and_get_conformer(self.rdk_mol)
 
         self.set_atom_positions(atom_positions)
@@ -157,9 +158,18 @@ class RDKitConformer:
         """Return distance (Å) between atoms i and j."""
         return rdMolTransforms.GetBondLength(self.rdk_conf, int(i), int(j))
 
+    # def set_bond_length(self, i, j, length):
+    #     """Set distance (Å) between atoms i and j."""
+    #     rdMolTransforms.SetBondLength(self.rdk_conf, int(i), int(j), float(length))
     def set_bond_length(self, i, j, length):
-        """Set distance (Å) between atoms i and j."""
-        rdMolTransforms.SetBondLength(self.rdk_conf, int(i), int(j), float(length))
+        i = int(i)
+        j = int(j)
+        length = float(length)
+        bond = self.mol.GetBondBetweenAtoms(i, j)
+        if bond is None:
+            raise ValueError(f"Tried to set bond length on non-bonded pair ({i}, {j})")
+        rdMolTransforms.SetBondLength(self.rdk_conf, i, j, length)
+
 
     def get_angle(self, i, j, k):
         """Return angle (radians) for i–j–k."""

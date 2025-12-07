@@ -176,6 +176,10 @@ class Conformer(ContinuousTorus):
         # ------------------------------------------------------------------
         # Internal coordinates meta-data: torsions, flex bond lengths/angles
         # ------------------------------------------------------------------
+        
+        # We can now access the RDKit Mol from the conformer
+        mol = self.conformer.rdk_mol
+
         # torsions used as DOFs
         self.n_torsion_angles = len(self.torsion_angles)
 
@@ -183,6 +187,40 @@ class Conformer(ContinuousTorus):
         self.flex_bond_lengths: List[Tuple[int, int]] = flex_bond_lengths or []
         self.flex_bond_angles: List[Tuple[int, int, int]] = flex_bond_angles or []
 
+        # === NEW: filter DOFs to keep only chemically valid bonds/angles ===
+        # 1) bond lengths: keep only pairs (i, j) that are actually bonded
+        #    and are NOT in a ring
+        valid_bl: List[Tuple[int, int]] = []
+        for (i, j) in self.flex_bond_lengths:
+            i = int(i)
+            j = int(j)
+            bond = mol.GetBondBetweenAtoms(i, j)
+            if bond is None:
+                print(f"[WARN] Dropping non-bonded pair ({i}, {j}) from flex_bond_lengths")
+                continue
+            if bond.IsInRing():
+                print(f"[WARN] Dropping ring bond ({i}, {j}) from flex_bond_lengths")
+                continue
+            valid_bl.append((i, j))
+        self.flex_bond_lengths = valid_bl
+
+
+        # 2) bond angles: keep only triplets (i, j, k) where i–j and j–k are bonds
+        valid_ba: List[Tuple[int, int, int]] = []
+        for (i, j, k) in self.flex_bond_angles:
+            i = int(i)
+            j = int(j)
+            k = int(k)
+            if (
+                mol.GetBondBetweenAtoms(i, j) is not None
+                and mol.GetBondBetweenAtoms(j, k) is not None
+            ):
+                valid_ba.append((i, j, k))
+            else:
+                print(f"[WARN] Dropping invalid angle ({i}, {j}, {k}) from flex_bond_angles")
+        self.flex_bond_angles = valid_ba
+
+        # After cleaning the lists, we can safely count DOFs
         self.n_bond_lengths = len(self.flex_bond_lengths)
         self.n_bond_angles = len(self.flex_bond_angles)
 
