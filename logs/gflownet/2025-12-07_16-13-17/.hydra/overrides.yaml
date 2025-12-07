@@ -1,0 +1,8 @@
+- env=conformers/conformer
+- policy=heterogeneous
+- proxy=molecule
+- gflownet=trajectorybalance
+- env.buffer.test.n=10
+- gflownet.optimizer.batch_size.forward=4
+- gflownet.optimizer.n_train_steps=100
+- logger.do.online=False

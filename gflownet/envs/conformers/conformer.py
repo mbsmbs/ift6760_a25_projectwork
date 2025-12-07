@@ -278,7 +278,7 @@ class Conformer(ContinuousTorus):
         # FIX: Explicitly set max_traj_length from config (defaults to 10 if missing)
         self.max_traj_length = kwargs.get("length_traj", 10)
 
-        print("random_output", self.random_output)
+        #print("random_output", self.random_output)
         # 7. Remaining Setup
         self.statebatch2oracle = self.statebatch2proxy
         self.statetorch2oracle = self.statetorch2proxy
@@ -771,51 +771,57 @@ class Conformer(ContinuousTorus):
         # Concatenate
         return torsion_out + geometry_out
 
-    def step_backwards(self, action, skip_mask_check=False):
-        # FIX: Handle the backward step from the "Sink" (Done) state gracefully.
-        # The base class asserts that action == eos, but our continuous policy 
-        # outputs random floats for this step because it has no discrete EOS head.
-        if self.done:
-            # We are at the Sink. Transition "back" to the Terminating State.
-            # We force the action to be EOS to satisfy the environment logic.
-            self.done = False
-            return self.state, self.eos, True
-        
-        # Otherwise, perform a normal backward step
-        return super().step_backwards(action, skip_mask_check)
-
     def step(self, action: Tuple[float], skip_mask_check: bool = False) -> Tuple[List[float], Tuple[float], bool]:
         # 1. Update the state based on continuous action
-        # (This calls parent logic to update torsions/geometry)
         self.state = self._get_next_state(self.state, action)
         
         # 2. Increment action counter
         self.n_actions += 1
         
         # 3. FORCE TERMINATION if max length reached
-        # This prevents the infinite loop.
         if self.n_actions >= self.max_traj_length:
             self.done = True
             
         return self.state, action, True
 
     def _get_next_state(self, state, action):
-        # Helper to apply action to state (vector addition)
-        # Action is [d_torsions, d_geometry]
-        # State is [torsions, geometry]
-        # (Simplified logic: state + action)
-        s = torch.tensor(state, device=self.device)
-        a = torch.tensor(action, device=self.device)
-        # Ensure shapes match if time dimension exists
-        return (s[:len(a)] + a).tolist() + s[len(a):].tolist()
-    
-    def step_backwards(self, action, skip_mask_check=False):
-        # FIX: Handle backward step from the "Sink" (Done state).
-        if self.done:
-            # If we are done, just un-flag done. 
-            # We ignore the specific 'action' value here because the transition 
-            # from Done -> Last State is deterministic in this fixed-length setting.
-            self.done = False
-            return self.state, action, True
+        """
+        Applies the continuous action vector to the state vector.
+        Handles dimension mismatch if state includes a timestamp.
+        """
+        s = torch.tensor(state, device=self.device, dtype=self.float)
+        a = torch.tensor(action, device=self.device, dtype=self.float)
+        
+        n_dims = len(a)
+        
+        # --- FIX: Slice state to match action dimension ---
+        physical_state = s[:n_dims] + a
+        # --------------------------------------------------
+        
+        # Handle Torsions Wrapping
+        if self.n_torsion_angles > 0:
+            physical_state[:self.n_torsion_angles] = torch.remainder(
+                physical_state[:self.n_torsion_angles], 2 * np.pi
+            )
+
+        # Handle Geometry Clipping
+        if n_dims > self.n_torsion_angles:
+            physical_state[self.n_torsion_angles:] = torch.clamp(
+                physical_state[self.n_torsion_angles:], -5.0, 5.0
+            )
             
+        # Reconstruct Full State (append time dimension if it existed)
+        if len(s) > n_dims:
+            final_state = torch.cat([physical_state, s[n_dims:]])
+        else:
+            final_state = physical_state
+            
+        return final_state.tolist()
+
+    def step_backwards(self, action, skip_mask_check=False):
+        # FIX: Handle the backward step from the "Sink" (Done) state gracefully.
+        if self.done:
+            self.done = False
+            return self.state, self.eos, True
+        
         return super().step_backwards(action, skip_mask_check)

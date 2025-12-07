@@ -29,7 +29,7 @@ class RDKitConformer:
         # --- OPTIMIZATION: INSTANT INITIALIZATION ---
         # We DO NOT call EmbedMolecule here. It is slow (100ms+).
         # Instead, we create a blank conformer container.
-        print("Creating blank conformer container")
+        # print("Creating blank conformer container")
         conf = Chem.Conformer(self.rdk_mol.GetNumAtoms())
         self.rdk_mol.AddConformer(conf)
         self.rdk_conf = self.rdk_mol.GetConformer()

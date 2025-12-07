@@ -666,15 +666,15 @@ class GFlowNetEnv:
             A list of randomly sampled terminating states.
         """
         states = []
-        print(f"[DEBUG] Generating {n_states} random states...") 
+        #print(f"[DEBUG] Generating {n_states} random states...") 
         for i in range(n_states):
-            print(f"[DEBUG] Molecule {i+1}/{n_states} starting...") 
+            #print(f"[DEBUG] Molecule {i+1}/{n_states} starting...") 
             state, _ = self.trajectory_random()
-            print(f"[DEBUG] State {i+1} generated: {state}")
+            #print(f"[DEBUG] State {i+1} generated: {state}")
             states.append(state)
-            if (i+1) % 10 == 0:
-                 print(f"[DEBUG] Molecule {i+1}/{n_states} done.") 
-        print("[DEBUG] Generation complete.") 
+            #if (i+1) % 10 == 0:
+                 #print(f"[DEBUG] Molecule {i+1}/{n_states} done.") 
+        #print("[DEBUG] Generation complete.") 
         return states
 
     def get_policy_output(self, params: Optional[dict] = None):
@@ -865,6 +865,11 @@ class GFlowNetEnv:
         strictly positive reward - provided self.reward_norm and self.reward_beta are
         positive - and larger than self.min_reward.
         """
+        # --- FIX: Ensure input is a Tensor before applying torch functions ---
+        if not torch.is_tensor(proxy_vals):
+            proxy_vals = torch.tensor(proxy_vals, device=self.device, dtype=self.float)
+        # ---------------------------------------------------------------------
+
         if self.denorm_proxy:
             # TODO: do with torch
             # TODO: review

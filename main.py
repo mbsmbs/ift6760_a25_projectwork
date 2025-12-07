@@ -72,7 +72,7 @@ def main(config):
     env = hydra.utils.instantiate(
         config.env,
         proxy=fast_init_proxy,
-        device="cpu", # Force env to CPU to avoid sync overhead
+        device=config.device,
         float_precision=config.float_precision,
     )
     print("env2")

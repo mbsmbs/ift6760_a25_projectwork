@@ -54,10 +54,8 @@ flex_bond_angles:
 # Neural Net outputs are usually ~O(1). 
 # We scale them down so we don't break the molecule.
 
-# 0.1 means a prediction of "1.0" becomes 0.1 Angstrom stretch.
-length_scale: 0.1  
-# 0.4 means a prediction of "1.0" becomes ~23 degrees bend.
-angle_scale: 0.4   
+length_scale: 0.01   # Previous: 0.1
+angle_scale: 0.05    # Previous: 0.3
 
 # ==========================================
 # 4. GFLOWNET PARAMETERS
@@ -67,7 +65,7 @@ policy_type: mlp
 # This must match main.yaml -> policy: heterogeneous
 
 # Trajectory
-length_traj: 1
+length_traj: 5
 reward_sampling_method: nested
 
 # Distributions (Von Mises for Torsions)
@@ -82,7 +80,7 @@ random_distribution:
 
 # Reward (Energy)
 reward_func: boltzmann
-reward_beta: 32
+reward_beta: 0.5 # prior: 32
 
 # Buffer
 buffer:
