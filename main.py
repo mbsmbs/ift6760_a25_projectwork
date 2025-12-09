@@ -34,7 +34,6 @@ class SimpleInitProxy(Proxy):
         
     def __call__(self, states):
         # Return a constant energy value. Must be a numpy array of floats.
-        print("call")
         return np.full(len(states), -50.0, dtype=np.float32)
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
@@ -61,13 +60,11 @@ def main(config):
         device=config.device,
         float_precision=config.float_precision,
     )
-    print("real_mmff_proxy")
     # 2. Instantiate the FAST DUMMY Proxy
     fast_init_proxy = SimpleInitProxy(
         device=config.device, 
         float_precision=config.float_precision
     )
-    print("fast_init_proxy")
     # 3. Instantiate Environment using the FAST Proxy (for buffer generation speed)
     env = hydra.utils.instantiate(
         config.env,
@@ -75,7 +72,6 @@ def main(config):
         device=config.device,
         float_precision=config.float_precision,
     )
-    print("env2")
     # 4. Policy configs
     forward_config = parse_policy_config(config, kind="forward")
     backward_config = parse_policy_config(config, kind="backward")
@@ -118,7 +114,6 @@ def main(config):
     # -------------------------------------------------------------------------
     # 5. INITIALIZE GFLOWNET (With FAST PROXY still active!)
     # -------------------------------------------------------------------------
-    print("\n[INFO] Initializing GFlowNet Agent (filling buffer with FAST proxy)...")
     
     gflownet = hydra.utils.instantiate(
         config.gflownet,
@@ -132,11 +127,9 @@ def main(config):
     )
     
     # -------------------------------------------------------------------------
-    # 6. NOW RESTORE THE REAL PROXY (After Buffer is filled)
-    # -------------------------------------------------------------------------
-    print("[INFO] Buffer filled. Swapping to REAL MMFF proxy for training.")
-    
-    # We must update the proxy in the environment object held by the agent
+    # 6. RESTORE THE REAL PROXY (After Buffer is filled)
+    # ------------------------------------------------------------------------
+    # update the proxy in the environment object held by the agent
     # (Since env is passed by reference, this updates it everywhere)
     env.proxy = real_mmff_proxy
     
@@ -146,7 +139,6 @@ def main(config):
     # -------------------------------------------------------------------------
     # 7. TRAIN
     # -------------------------------------------------------------------------
-    print("calling train")
     gflownet.train()
 
     # Sample from trained GFlowNet
@@ -169,11 +161,6 @@ def main(config):
         pickle.dump(
             dct, open(f"conformers_{env.smiles}_{type(env.proxy).__name__}.pkl", "wb")
         )
-
-    # Print replay buffer
-    if len(gflownet.buffer.replay) > 0:
-        print("\nReplay buffer:")
-        print(gflownet.buffer.replay)
 
     # Close logger
     gflownet.logger.end()

@@ -111,11 +111,6 @@ class Conformer(ContinuousTorus):
             self.smiles, self.torsion_indices
         )
         
-        # ------------------------------------------------------------------
-        # FIX: MOVED BLOCK (Steps 3, 4, and 5) UP TO DEFINE FLEXIBLE BONDS.
-        # The first set_conformer() call (original line 113) is removed here.
-        # ------------------------------------------------------------------
-
         # 3. Setup Flexible Bonds & Angles
         tmp_mol = Chem.MolFromSmiles(self.smiles)
         tmp_mol = Chem.AddHs(tmp_mol)
@@ -135,8 +130,8 @@ class Conformer(ContinuousTorus):
         self.n_bond_lengths = len(self.flex_bond_lengths)
         self.n_bond_angles = len(self.flex_bond_angles)
         
-        # 4. Create Conformer Object (First stable call)
-        # We now call set_conformer() only once, after all definitions are ready.
+        # 4. Create Conformer Object
+        # call set_conformer() only once, after all definitions are ready.
         self.set_conformer() 
 
         # 5. Store Reference Values
@@ -165,8 +160,8 @@ class Conformer(ContinuousTorus):
         # 7. Parent Init (Passes the length 278 list/tensor to the parent)
         super().__init__(
             n_dim=internal_dim, 
-            fixed_policy_output=self.fixed_policy_output, # <--- Passes the correct list
-            random_policy_output=self.random_policy_output, # <--- Passes the correct list
+            fixed_policy_output=self.fixed_policy_output, 
+            random_policy_output=self.random_policy_output, 
             **kwargs
         )
 
@@ -183,8 +178,8 @@ class Conformer(ContinuousTorus):
             dtype=torch.float32, 
             device=dev
         )
-        # We must also ensure the environment's internal dimension is correct:
-        # Assuming the parent class sets self.output_dim. We force it to the correct length.
+        # ensure the environment's internal dimension is correct:
+        # Assuming the parent class sets self.output_dim. force it to the correct length.
         self.output_dim = len(self.fixed_output)
 
         self.max_traj_length = kwargs.get("length_traj", 10)
@@ -299,7 +294,6 @@ class Conformer(ContinuousTorus):
 
         if self.n_torsion_angles > 0:
             z_tors_deg = np.degrees(z_tors)
-            # REMOVED DEBUG PRINT to clean logs
             self.conformer.set_torsion_vector(self.torsion_angles, z_tors_deg)
 
         if self.n_bond_lengths > 0 and z_len is not None:
@@ -362,7 +356,7 @@ class Conformer(ContinuousTorus):
         new_instance.conformer = self.conformer
         return new_instance
 
-    # --- ROBUST REWARD METHOD ---
+    # --- REWARD METHOD ---
     def reward_batch(self, states: List[List]) -> TensorType["batch"]:
         """
         Computes the geometric reward: exp( -Energy + log_Jacobian )

@@ -859,7 +859,7 @@ class GFlowNetAgent:
                     n_replay=self.batch_size.backward_replay,
                 )
                 batch.merge(sub_batch)
-            print("batch merged")
+            
             for j in range(self.ttsr):
                 if self.loss == "flowmatch":
                     losses = self.flowmatch_loss(
@@ -918,7 +918,7 @@ class GFlowNetAgent:
             )
             # Train logs
             t0_log = time.time()
-            print("calling log_train")
+            
             self.logger.log_train(
                 losses=losses,
                 rewards=rewards,
@@ -1155,7 +1155,7 @@ class GFlowNetAgent:
             batch = Batch(env=self.env, device=self.device, float_type=self.float)
             self.random_action_prob = 0
             t = time.time()
-            print("Sampling from GFN...", end="\r")
+            
             for b in batch_with_rest(
                 0, self.logger.test.n_top_k, self.batch_size_total
             ):
@@ -1177,7 +1177,6 @@ class GFlowNetAgent:
             if not random_states:
                 batch = Batch(env=self.env, device=self.device, float_type=self.float)
                 self.random_action_prob = 1.0
-                print("[test_top_k] Sampling at random...", end="\r")
                 for b in batch_with_rest(
                     0, self.logger.test.n_top_k, self.batch_size_total
                 ):

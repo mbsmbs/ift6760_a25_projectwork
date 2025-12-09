@@ -69,7 +69,6 @@ class HeterogeneousPolicyHead(nn.Module):
 
         # Concatenate everything into one big vector
         # This satisfies gflownet.py which expects a single tensor
-        #print("finished forward pass")
         return torch.cat(outputs, dim=-1)
 
 #--- INSERT END ---
@@ -123,10 +122,6 @@ class Policy:
         self.n_bond_lengths = len(getattr(env, "flex_bond_lengths", []))
         self.n_bond_angles = len(getattr(env, "flex_bond_angles", []))
 
-        print(f"n_torsions: {self.n_torsions}")
-        print(f"n_bond_lengths: {self.n_bond_lengths}")
-        print(f"n_bond_angles: {self.n_bond_angles}")
-
         self.parse_config(config)
         self.instantiate()
 
@@ -179,13 +174,9 @@ class Policy:
             # 1. Build Backbone
             backbone = self.make_backbone(nn.LeakyReLU())
             
-            # --- CRITICAL FIX: SYNC COMPONENTS WITH ENVIRONMENT ---
-            # Remove the hardcoded "n_components = 5"
-            # Read it dynamically from the environment instance.
+            
             # If env doesn't have n_comp, default to 1 or 5 (safety).
             n_components = getattr(self.env, "n_comp", 5) 
-            
-            print(f"DEBUG: Policy Initializing with n_components={n_components}")
             # ------------------------------------------------------
 
             # 3. Build Head

@@ -628,7 +628,6 @@ class GFlowNetEnv:
             if valid:
                 actions.append(action)
                 
-        # print(f"[DEBUG] Final state") 
         return self.state, actions
 
     def get_random_terminating_states(
@@ -875,7 +874,6 @@ class GFlowNetEnv:
             vals = proxy_vals.detach().cpu().numpy()
         else:
             vals = proxy_vals
-        print(f"[PHYSICS CHECK] Raw Energies (Batch First 5): {vals[:5]}", flush=True)
         # -----------------------------------
 
         if self.denorm_proxy:
