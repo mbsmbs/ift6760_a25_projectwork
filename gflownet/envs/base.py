@@ -865,10 +865,18 @@ class GFlowNetEnv:
         strictly positive reward - provided self.reward_norm and self.reward_beta are
         positive - and larger than self.min_reward.
         """
+        
         # --- FIX: Ensure input is a Tensor before applying torch functions ---
         if not torch.is_tensor(proxy_vals):
             proxy_vals = torch.tensor(proxy_vals, device=self.device, dtype=self.float)
         # ---------------------------------------------------------------------
+
+        if isinstance(proxy_vals, torch.Tensor):
+            vals = proxy_vals.detach().cpu().numpy()
+        else:
+            vals = proxy_vals
+        print(f"[PHYSICS CHECK] Raw Energies (Batch First 5): {vals[:5]}", flush=True)
+        # -----------------------------------
 
         if self.denorm_proxy:
             # TODO: do with torch

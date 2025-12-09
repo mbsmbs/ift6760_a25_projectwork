@@ -114,11 +114,18 @@ class Policy:
         )
         self.output_dim = len(self.fixed_output)
         self.base = base
+        self.env = env
         
         # Geometric Dimensions (Safe getattr)
-        self.n_torsions = getattr(env, "n_torsion_angles", 0)
-        self.n_bond_lengths = getattr(env, "n_bond_lengths", 0)
-        self.n_bond_angles = getattr(env, "n_bond_angles", 0)
+        # base.py (New logic to read fully calculated dimensions from the environment)
+        self.n_torsions = env.n_torsion_angles # Should be calculated by env based on -1
+        # The env should have calculated the full flexible lists and exposed their length
+        self.n_bond_lengths = len(getattr(env, "flex_bond_lengths", []))
+        self.n_bond_angles = len(getattr(env, "flex_bond_angles", []))
+
+        print(f"n_torsions: {self.n_torsions}")
+        print(f"n_bond_lengths: {self.n_bond_lengths}")
+        print(f"n_bond_angles: {self.n_bond_angles}")
 
         self.parse_config(config)
         self.instantiate()
@@ -172,10 +179,14 @@ class Policy:
             # 1. Build Backbone
             backbone = self.make_backbone(nn.LeakyReLU())
             
-            # 2. FORCE N_COMPONENTS TO 5
-            # We know from config/env/conformer.yaml that n_comp is 5.
-            n_components = 5
-            print(f"[DEBUG POLICY] Forcing n_components = {n_components} to match Environment.")
+            # --- CRITICAL FIX: SYNC COMPONENTS WITH ENVIRONMENT ---
+            # Remove the hardcoded "n_components = 5"
+            # Read it dynamically from the environment instance.
+            # If env doesn't have n_comp, default to 1 or 5 (safety).
+            n_components = getattr(self.env, "n_comp", 5) 
+            
+            print(f"DEBUG: Policy Initializing with n_components={n_components}")
+            # ------------------------------------------------------
 
             # 3. Build Head
             head = HeterogeneousPolicyHead(

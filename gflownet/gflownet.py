@@ -125,7 +125,6 @@ class GFlowNetAgent:
         self.forward_policy = forward_policy
         if self.forward_policy.checkpoint is not None:
             self.logger.set_forward_policy_ckpt_path(self.forward_policy.checkpoint)
-            # TODO: re-write the logic and conditions to reload a model
             if False:
                 self.forward_policy.load_state_dict(
                     torch.load(self.policy_forward_path)
