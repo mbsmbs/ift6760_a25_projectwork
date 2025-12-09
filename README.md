@@ -66,12 +66,12 @@ Where:
 
 - env=conformers/conformer: Specifies the environment configuration for **conformer generation**.
 - policy=heterogeneous: Defines the GFlowNet policy to handle a **diverse/mixed set of actions** (e.g., different types of structural modifications).
-- proxy=molecule: Denotes the proxy model used for the reward, suggesting the reward is derived from the molecular structure or properties. Other options from original implementation: conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
+- proxy=molecule: Denotes the proxy model used for the reward, suggesting the reward is derived from the molecular structure or properties. Other options from original implementation: `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
 - gflownet=trajectorybalance: Sets the GFlowNet objective to the Trajectory Balance algorithm.
 - env.buffer.test.n = 10: Sets the number of testing samples n  to be stored in the environment's test buffer to 10.
 - gflownet.optimizer.batch_size.forward=16: Sets the batch size for the forward pass of the GFlowNet optimizer to 16.
-- env.flex_bond_lengths=None: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible bonds. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
-- env.flex_bond_angles=None: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible angles. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
+- env.flex_bond_lengths=Null: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible bonds. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
+- env.flex_bond_angles=Null: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible angles. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
 - env.n_torsion_angles=-1: Sets the number of torsion angles to be controlled to -1, which usually means all rotatable bonds are included in the search space.
 
 ## Citation
