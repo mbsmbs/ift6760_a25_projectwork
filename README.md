@@ -56,20 +56,23 @@ python -m pip install -r requirements.txt
 
 ## Training
 
-Example command to train a Conf-GFlowNet on the specific molecule `CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O` and TorchANI as the energy proxy estimator for the reward:
+Example command to train a Conf-GFlowNet on ibuprofen `CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O` and TorchANI as the energy proxy estimator for the reward:
 
 ```bash
-python main.py +experiments=ai4mat23/mlp_torchani device=cpu 'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"' proxy=conformers/torchani logger.do.online=True user.logdir.root=logs
+python main.py     env=conformers/conformer     policy=heterogeneous     proxy=molecule     gflownet=trajectorybalance     env.buffer.test.n=10     gflownet.optimizer.batch_size.forward=16  env.flex_bond_lengths=None env.flex_bond_angles=None env.n_torsion_angles= -1 
 ```
 
 Where:
 
-- `+experiments=ai4mat23/mlp_torchani` points to a config file with hyperparameters defined (see [here](https://github.com/GFNOrg/conf-gfn/blob/main/config/experiments/ai4mat23/mlp_torchani.yaml)).
-- `device=cpu` specifies the device (`cpu` or `cuda`).
-- `'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"'` specifies the SMILES of a molecule. Alternatively, you can use `env.smiles=ID`, e.g. `env.smiles=0`, to run on one of the [predefined molecules](https://github.com/GFNOrg/conf-gfn/blob/main/gflownet/envs/conformers/conformer.py) used in the experiments described in the paper.
-- `proxy=conformers/torchani` denotes the proxy model: either `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
-- `logger.do.online=True` whether to log the results to wandb.
-- `user.logdir.root=logs` points to a directory in which log files will be stored.
+- env=conformers/conformer: Specifies the environment configuration for **conformer generation**.
+- policy=heterogeneous: Defines the GFlowNet policy to handle a **diverse/mixed set of actions** (e.g., different types of structural modifications).
+- proxy=molecule: Denotes the proxy model used for the reward, suggesting the reward is derived from the molecular structure or properties. Other options from original implementation: `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
+- gflownet=trajectorybalance: Sets the GFlowNet objective to the Trajectory Balance algorithm.
+- env.buffer.test.n = 10: Sets the number of testing samples n  to be stored in the environment's test buffer to 10.
+- gflownet.optimizer.batch_size.forward=16: Sets the batch size for the forward pass of the GFlowNet optimizer to 16.
+- env.flex_bond_lengths=Null: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible bonds. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
+- env.flex_bond_angles=Null: Enables full flexibility for those geometry parameters by triggering the automatic discovery of all flexible angles. Other option: empty list indicating no specific bond lengths are allowed to be flexible/modified during the conformational search.
+- env.n_torsion_angles=-1: Sets the number of torsion angles to be controlled to -1, which usually means all rotatable bonds are included in the search space.
 
 ## Citation
 
