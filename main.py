@@ -142,25 +142,69 @@ def main(config):
     gflownet.train()
 
     # Sample from trained GFlowNet
-    if config.n_samples > 0 and config.n_samples <= 1e5:
+    # -------------------------------------------------------------------------
+    # 8. FINAL SAMPLING & METRICS SAVING
+    # -------------------------------------------------------------------------
+    if True:
+        #config.n_samples > 0 and config.n_samples <= 1e5:
+        print("Sampling from trained GFlowNet: ",  config.n_samples)
+        n_samples_fixed = 2000
+        # 1. Sample a batch of trajectories
         batch, times = gflownet.sample_batch(n_forward=config.n_samples, train=False)
+        
+        # 2. Get states and calculate energies (Ground Truth / Proxy)
         x_sampled = batch.get_terminating_states(proxy=True)
-        energies = env.oracle(x_sampled)
+        energies = env.oracle(x_sampled) # Returns numpy array
         x_sampled = batch.get_terminating_states()
+        
+        # 3. Calculate Log Flow (Predicted Log Reward)
+        # log_F(x) = log Z + sum(log P_F(tau))
+        # We use the agent's internal method to compute trajectory probabilities
+        logprobs_f = gflownet.compute_logprobs_trajectories(batch, backward=False)
+        
+        # Extract Log Z (detached from graph)
+        if gflownet.logZ is not None:
+            log_Z_val = gflownet.logZ.sum().detach().cpu().numpy()
+        else:
+            log_Z_val = 0.0 # For FlowMatching, logZ might be implicit or None
+
+        # Combine to get the Model's prediction of log-probability
+        log_F = logprobs_f.detach().cpu().numpy() + log_Z_val
+
+        # 4. Calculate Log Reward (Target Log Probability)
+        # log R(x) = -beta * Energy(x)
+        # Ensure we use the same beta as the environment
+        beta = getattr(env, "reward_beta", 32.0) # Default to 32 if not found
+        log_reward = -beta * energies
+
+        # 5. Save DataFrames and Pickle
         df = pd.DataFrame(
             {
                 "readable": [env.state2readable(x) for x in x_sampled],
                 "energies": energies.tolist(),
+                "log_reward": log_reward.tolist(),
+                "log_F": log_F.tolist()
             }
         )
         df.to_csv("gfn_samples.csv")
-        dct = {"x": x_sampled, "energy": energies}
+        
+        # Save dictionary with all raw data for analysis scripts
+        dct = {
+            "x": x_sampled, 
+            "energy": energies,
+            "log_reward": log_reward, # <--- Used for KL/RMSE
+            "log_F": log_F            # <--- Used for KL/RMSE
+        }
         pickle.dump(dct, open("gfn_samples.pkl", "wb"))
-        # TODO: refactor before merging
-        dct["conformer"] = [env.set_conformer(state).rdk_mol for state in x_sampled]
-        pickle.dump(
-            dct, open(f"conformers_{env.smiles}_{type(env.proxy).__name__}.pkl", "wb")
-        )
+
+        # Save RDKit conformers (Optional/Existing logic)
+        try:
+            dct["conformer"] = [env.set_conformer(state).rdk_mol for state in x_sampled]
+            pickle.dump(
+                dct, open(f"conformers_{env.smiles}_{type(env.proxy).__name__}.pkl", "wb")
+            )
+        except Exception as e:
+            print(f"Skipping RDKit conformer save due to: {e}")
 
     # Close logger
     gflownet.logger.end()
