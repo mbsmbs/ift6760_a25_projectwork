@@ -15,7 +15,6 @@ external/
 .DS_Store
 docs/_build/
 
-project_debug/
 *.ckpt
 *.pkl
 *.log
