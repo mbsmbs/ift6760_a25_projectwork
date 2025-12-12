@@ -10,7 +10,37 @@ This repository is a **fork** of `GFNOrg/conf-gfn` used for the IFT6760 A25
 project on sampling full intrinsic coordinates (torsions, bond angles and
 bond lengths) with GFlowNets.
 
+Our work is organized in two stages:
+
+- **Stage 1 (used in the report):** extended `Conf-GFlowNet` environment where a subset of
+  bond lengths and bond angles (BLA) are controllable alongside torsions. We train and
+  compare a torsion-only baseline and a torsions+ BLA model on ibuprofen using a
+  TorchANI-based reward.
+- **Stage 2 (prototype):** ongoing re-implementation with a heterogeneous policy
+  (separate heads for torsions vs. geometric coordinates) and Jacobian-aware rewards.
+  This code is experimental and not used for the main quantitative results in the paper.
+
+---
+
 ## Installation
+
+### Recommended setup
+
+To reproduce our experiments, create a new environment and install the dependencies specified in requirements.txt
+
+For other environments (e.g. macOS, Windows, or Linux/CPU-only), a simpler setup that we use in this fork is:
+
+```bash
+# Create and activate the environment
+conda create -n confgfn python=3.8
+conda activate confgfn
+
+# Install the exact dependencies used in this fork
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### Original Conf-GFlowNet CUDA setup (optional)
 
 The commands below are the original installation instructions from the
 Conf-GFlowNet repository. They assume a **Linux** machine with an
@@ -38,38 +68,50 @@ python -m pip install numpy pandas hydra-core tqdm torchtyping six xtb scikit-le
 python -m pip install -U --no-deps pytorch3d==0.3.0
 ```
 
-### Recommended setup
+## Training (our experiments)
 
-To reproduce our experiments, create a new environment and install the dependencies specified in requirements.txt
+All commands below are run from the repository root.
 
-For other environments (e.g. macOS, Windows, or Linux/CPU-only), a simpler setup that we use in this fork is:
-
-```bash
-# Create and activate the environment
-conda create -n confgfn python=3.8
-conda activate confgfn
-
-# Install the exact dependencies used in this fork
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-## Training
-
-Example command to train a Conf-GFlowNet on the specific molecule `CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O` and TorchANI as the energy proxy estimator for the reward:
+### Stage 1 – torsion-only baseline
 
 ```bash
-python main.py +experiments=ai4mat23/mlp_torchani device=cpu 'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"' proxy=conformers/torchani logger.do.online=True user.logdir.root=logs
+python main.py +experiment=<torsion_only_experiment> device=cpu \
+  env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O" \
+  proxy=conformers/torchani user.logdir.root=logs/hybrid_extended
 ```
 
-Where:
+### Stage 1 – extended torsions + BLA model
 
-- `+experiments=ai4mat23/mlp_torchani` points to a config file with hyperparameters defined (see [here](https://github.com/GFNOrg/conf-gfn/blob/main/config/experiments/ai4mat23/mlp_torchani.yaml)).
-- `device=cpu` specifies the device (`cpu` or `cuda`).
-- `'env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O"'` specifies the SMILES of a molecule. Alternatively, you can use `env.smiles=ID`, e.g. `env.smiles=0`, to run on one of the [predefined molecules](https://github.com/GFNOrg/conf-gfn/blob/main/gflownet/envs/conformers/conformer.py) used in the experiments described in the paper.
-- `proxy=conformers/torchani` denotes the proxy model: either `conformers/tblite` for GFN2-xTB, `conformers/xtb` for GFN-FF, or `conformers/torchani` for TorchANI.
-- `logger.do.online=True` whether to log the results to wandb.
-- `user.logdir.root=logs` points to a directory in which log files will be stored.
+```bash
+python main.py +experiment=<torsions_bla_experiment> device=cpu \
+  env.smiles="CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O" \
+  proxy=conformers/torchani user.logdir.root=logs/hybrid_extended
+```
+
+Replace <torsion_only_experiment> and <torsions_bla_experiment> with the Hydra
+config names you used for the baseline and extended runs (e.g. the configs under
+conf/hybrid_extended/). These commands reproduce the logs in logs/hybrid_extended/
+used to generate the energy–RMSD comparison plots in the report.
+
+### Comparing energy and RMSD (Figure 1 in the report)
+
+```bash
+python project_debug/compare_rmsd_and_energy.py \
+  base_dir=logs/hybrid_extended/<baseline_run_id> \
+  ext_dir=logs/hybrid_extended/<extended_run_id>
+```
+
+This script creates energy_rmsd_comparison.png, which is the figure reported in the
+Results section.
+
+### Stage 2 - full intrinsic coordinates (still processing)
+
+The second-stage full–intrinsic-coordinate implementation (heterogeneous policy,
+Jacobian-aware reward) is located in:
+
+[Link to the development branch](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/feature/julia_testing?tab=readme-ov-file)
+
+[Link to the development branch](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/fully_flexible?tab=readme-ov-file)
 
 ## Acknowledgment
 
