@@ -1,4 +1,4 @@
-# Conf-GFlowNet
+# Conf-GFlowNet (Our starting point)
 
 This repository implements the experiments described in [Towards equilibrium molecular conformation generation with GFlowNets](https://arxiv.org/abs/2310.14782) by Volokhova & Koziarski et al.
 
