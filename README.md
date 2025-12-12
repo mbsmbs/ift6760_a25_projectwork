@@ -109,9 +109,9 @@ Results section.
 The second-stage full–intrinsic-coordinate implementation (heterogeneous policy,
 Jacobian-aware reward) is located in:
 
-[Link to the development branch](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/feature/julia_testing?tab=readme-ov-file)
+[Link to the development branch 1](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/feature/julia_testing?tab=readme-ov-file)
 
-[Link to the development branch](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/fully_flexible?tab=readme-ov-file)
+[Link to the development branch 2](https://github.com/mbsmbs/ift6760_a25_projectwork/tree/fully_flexible?tab=readme-ov-file)
 
 ## Acknowledgment
 
